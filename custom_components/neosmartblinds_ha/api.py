@@ -184,9 +184,12 @@ class NeoSmartCloudAPI:
         # Get existing headers from kwargs or create new dict
         headers = kwargs.get("headers", {})
         # Add all required headers to this specific request
+        
+        # Changed : to = and added missing quote
         headers["Authorization"] = f"Bearer {self._access_token}"
         headers["Origin"] = "https://app.neosmartblinds.com"
         headers["Referer"] = "https://app.neosmartblinds.com/"
+        
         kwargs["headers"] = headers
             
         try:
@@ -241,7 +244,7 @@ class NeoSmartCloudAPI:
         
         # --- DEBUGGING ---
         # This will log the entire data blob to your HA log.
-        # Remove this after we confirm the new keys.
+        # We can remove this later, but it's useful for now.
         _LOGGER.info("Full API data payload: %s", data)
         # --- END DEBUGGING ---
         
@@ -330,19 +333,15 @@ def parse_blinds_from_data(data: dict) -> list:
             continue
             
         for channel, blind in room.get("blinds", {}).items():
-            if not blind:
+            if not blind: # Skip empty blind slots (like '01': None)
                 continue
             
             blind_name = blind.get("name")
             blind_code = f"{room_token}-{channel.zfill(2)}"
             
-            # --- MODIFIED ---
-            # Guessing key names from PDF.
-            # 'motor_code' is from "Motor code" [cite: 213]
-            # 'is_tdbu' is from "Top-D/Bottom-U: NO" 
-            # We will log the full payload in async_get_data to confirm these.
-            motor_code = blind.get("motor_code", "unknown") # default to unknown
-            is_tdbu = blind.get("tdbu", False) # default to False
+            motor_code = blind.get("motorCode", "unknown") 
+            
+            is_tdbu = blind.get("tdbu", False) 
             
             blinds_list.append({
                 "unique_id": f"{controller_id}_{blind_code}",
@@ -354,7 +353,6 @@ def parse_blinds_from_data(data: dict) -> list:
                 "motor_code": motor_code,
                 "is_tdbu": is_tdbu,
             })
-            # --- END MODIFIED ---
             
     return blinds_list
 
