@@ -1,0 +1,7 @@
+{
+  "name": "Neo Smart Blinds (Cloud)",
+  "domains": [
+    "neosmartblinds_ha"
+  ],
+  "render_readme": true
+}

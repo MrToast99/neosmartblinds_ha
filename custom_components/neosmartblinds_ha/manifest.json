@@ -1,0 +1,14 @@
+{
+  "domain": "neosmartblinds_ha",
+  "name": "Neo Smart Blinds (Cloud)",
+  "documentation": "https://github.com/MrToast99/NeoSmartBlinds_HA",
+  "issue_tracker": "https://github.com/MrToast99/NeoSmartBlinds_HA/issues",
+  "codeowners": ["@MrToast99"],
+  "config_flow": true,
+  "iot_class": "cloud_polling",
+  "version": "1.0.0",
+  "platforms": [
+    "cover",
+    "switch"
+  ]
+}
