@@ -36,6 +36,13 @@ Configuration is done through the Home Assistant UI:
 4.  You will be prompted for your Neo Smart Blinds app **Username (Email)** and **Password**.
 5.  The integration will log in, discover your devices, and add them to Home Assistant.
 
+## How It Works
+
+This integration works by polling the official Neo Smart Blinds cloud API.
+
+* **Automatic Entity Setup:** After you log in, the integration automatically queries the cloud for your account details. It then creates Home Assistant cover and switch entities for all the blinds and schedules registered to your account.
+* **Cloud Requirement:** This integration **only** works with blinds that are already set up and connected in the Neo Smart Blinds app. It relies entirely on the cloud connection and does not support local-only control.
+
 ## Features
 
 ### Cover Controls
