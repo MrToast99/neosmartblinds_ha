@@ -4,7 +4,7 @@ import logging
 import base64
 import json
 import time
-import random
+import random # Keep random for a fallback
 
 from homeassistant.core import HomeAssistant
 from homeassistant.const import CONF_USERNAME, CONF_PASSWORD
@@ -26,10 +26,13 @@ from .const import (
 _LOGGER = logging.getLogger(__name__)
 REQUEST_TIMEOUT = 15.0
 
-
+#
+# --- HELPER FUNCTION FOR SCHEDULE NAMES ---
+#
 def _get_friendly_command_name(command: str) -> str:
     """Translate a command code to a friendly name."""
     
+    # Map from command codes (like in const.py) to names
     cmd_map = {
         "up": "Open",
         "dn": "Close",
@@ -53,6 +56,9 @@ def _get_friendly_command_name(command: str) -> str:
         return f"Position {command}%"
         
     return command.upper() # Fallback, e.g., "FAV_1"
+
+# --- END HELPER FUNCTION ---
+
 
 class NeoSmartCloudAuthError(ConfigEntryAuthFailed):
     """Exception for authentication errors."""
@@ -365,7 +371,6 @@ def parse_schedules_from_data(data: dict) -> list:
     for schedule_id, schedule in schedules.items():
         
         friendly_name = f"Schedule {schedule_id}" # Start with a fallback
-        
         try:
             schedule_time = schedule.get("time", "Unknown Time")
             schedule_cmd = schedule.get("command", "cmd")
@@ -376,7 +381,6 @@ def parse_schedules_from_data(data: dict) -> list:
                 room_name = rooms[room_id].get("name", room_name) # e.g., "Master"
             
             command_name = _get_friendly_command_name(schedule_cmd) # e.g., "Favorite 1"
-
             friendly_name = f"{room_name} {command_name} at {schedule_time}"
         
         except Exception as e:
@@ -390,7 +394,27 @@ def parse_schedules_from_data(data: dict) -> list:
             schedule_data["controller_id"] = rooms[room_id].get("controller")
         
         schedule_data["name"] = friendly_name
-        
         schedules_list.append(schedule_data)
             
     return schedules_list
+
+def parse_controllers_from_data(data: dict) -> list:
+    """Parse a unique list of controllers from the data payload."""
+    controllers = {} # Use a dict to store unique controllers
+    rooms = data.get("rooms", {})
+    if not rooms:
+        _LOGGER.warning("No rooms found, cannot parse controllers.")
+        return []
+
+    for room in rooms.values():
+        controller_id = room.get("controller")
+        
+        # We only add the controller once, using the first
+        # room name we see as its "representative" name.
+        if controller_id and controller_id not in controllers:
+            controllers[controller_id] = {
+                "id": controller_id,
+                "room_name": room.get("name", "Unknown Room")
+            }
+            
+    return list(controllers.values())
