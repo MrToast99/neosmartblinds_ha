@@ -9,7 +9,12 @@ from homeassistant.const import CONF_USERNAME, Platform
 from homeassistant.helpers import device_registry as dr
 
 from .const import DOMAIN
-from .api import NeoSmartCloudAPI, NeoSmartCloudAuthError
+from .api import (
+    NeoSmartCloudAPI, 
+    NeoSmartCloudAuthError, 
+    parse_controllers_from_data
+)
+
 PLATFORMS: list[Platform] = [Platform.COVER, Platform.SWITCH, Platform.BUTTON]
 _LOGGER = logging.getLogger(__name__)
 
@@ -18,7 +23,6 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     
     hass.data.setdefault(DOMAIN, {})
     
-    # Create the cloud client
     cloud_client = get_async_client(hass, verify_ssl=True)
     cloud_api = NeoSmartCloudAPI(hass, entry.data, cloud_client)
     
@@ -32,15 +36,15 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         _LOGGER.error("Failed to login and fetch data: %s", err)
         return False
         
-    # Store the API object and data
+    # Store the API object and data for platforms to use
     hass.data[DOMAIN][entry.entry_id] = {
         "api": cloud_api,
         "data": full_data
     }
 
-    # Create the parent "Account" device
-    account_username = entry.data[CONF_USERNAME]
     device_registry = dr.async_get(hass)
+
+    account_username = entry.data[CONF_USERNAME]
     device_registry.async_get_or_create(
         config_entry_id=entry.entry_id,
         identifiers={(DOMAIN, account_username)},
@@ -49,7 +53,20 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         model="Cloud Account",
         entry_type=dr.DeviceEntryType.SERVICE,
     )
+
+    controllers = parse_controllers_from_data(full_data)
+    _LOGGER.debug("Found and creating %d controllers", len(controllers))
     
+    for controller in controllers:
+        device_registry.async_get_or_create(
+            config_entry_id=entry.entry_id,
+            identifiers={(DOMAIN, controller["id"])},
+            name=f"Neo Controller ({controller['room_name']})", # e.g., "Neo Controller (Master)"
+            manufacturer="Neo Smart Blinds",
+            model="Cloud Controller",
+            # Link this controller to the main account
+            via_device=(DOMAIN, account_username) 
+        )
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
     
     return True
