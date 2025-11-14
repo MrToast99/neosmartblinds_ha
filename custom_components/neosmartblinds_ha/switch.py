@@ -30,7 +30,7 @@ async def async_setup_entry(
         NeoSmartScheduleSwitch(
             controller=controller,
             schedule_data=schedule,
-            account_username=entry.data["username"]
+            account_username=entry.data["username"] # Pass this for via_device
         )
         for schedule in schedules
     ]
@@ -39,8 +39,6 @@ async def async_setup_entry(
 class NeoSmartScheduleSwitch(SwitchEntity):
     """Representation of a Neo Smart Blind Schedule Switch."""
 
-    # This tells HA that the switch's name should be
-    # <Device Name> <Entity Name> (e.g., "Dining Controller" "Morning")
     _attr_has_entity_name = True
     _attr_icon = "mdi:calendar-clock"
 
@@ -48,24 +46,18 @@ class NeoSmartScheduleSwitch(SwitchEntity):
         """Initialize the schedule switch."""
         self._controller = controller
         self._schedule_id = schedule_data["id"]
-        self._controller_id = schedule_data["controller_id"]
+        self._controller_id = schedule_data.get("controller_id") # Get from parser
         self._room_name = schedule_data.get("room_name", "Unknown")
         
         self._attr_unique_id = self._schedule_id
-        self._attr_name = schedule_data.get("name", f"Schedule {self._schedule_id}")
+        self._attr_name = schedule_data.get("name") # Name is now pre-built
         self._attr_is_on = schedule_data.get("enabled", False)
 
-        #
-        # --- THIS ATTACHES THE SWITCH TO THE CONTROLLER DEVICE ---
-        #
-        self._attr_device_info = DeviceInfo(
-            identifiers={(DOMAIN, self._controller_id)}, # ID'd by the Controller
-            name=f"Neo Controller ({self._room_name})",
-            manufacturer="Neo Smart Blinds",
-            model="Cloud Controller",
-            via_device=(DOMAIN, account_username) # Links to the "Account"
-        )
-        
+        if self._controller_id:
+            self._attr_device_info = DeviceInfo(
+                identifiers={(DOMAIN, self._controller_id)}
+            )
+
     @property
     def extra_state_attributes(self):
         """Return the state attributes."""
