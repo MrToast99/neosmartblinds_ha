@@ -41,8 +41,6 @@ async def async_setup_entry(
 class NeoSmartFavoriteButtonBase(ButtonEntity):
     """Base class for a Neo Smart Blind Favorite Button."""
 
-    # This tells HA that the button's name should be
-    # <Device Name> <Entity Name> (e.g., "Dining Blind" "Favorite 1")
     _attr_has_entity_name = True
 
     def __init__(self, controller: NeoSmartCloudAPI, blind_data: dict):
@@ -52,11 +50,6 @@ class NeoSmartFavoriteButtonBase(ButtonEntity):
         self._controller_id = blind_data["controller_id"]
         self._blind_unique_id = blind_data["unique_id"] # Get the blind's ID
         
-        #
-        # --- THIS IS THE NEW DEVICE ATTACHMENT ---
-        # We are ATTACHING this entity to the "Blind" device
-        # that was created by cover.py.
-        #
         self._attr_device_info = DeviceInfo(
             identifiers={(DOMAIN, self._blind_unique_id)} # Must match cover.py
         )
@@ -68,7 +61,7 @@ class NeoSmartFavorite1Button(NeoSmartFavoriteButtonBase):
         """Initialize the Favorite 1 button."""
         super().__init__(controller, blind_data)
         self._attr_unique_id = f"{self._blind_unique_id}_favorite_1"
-        self._attr_name = "Favorite 1" # This is all we need
+        self._attr_name = "Favorite 1"
         self._attr_icon = "mdi:star-outline"
 
     async def async_press(self) -> None:
