@@ -1,6 +1,6 @@
 """Constants for the Neo Smart Blinds (Cloud) integration."""
 
-DOMAIN = "neosmartblinds_ha"
+DOMAIN = "neosmartblinds"
 
 # Endpoints from HAR file
 API_BASE_URL = "https://api.neosmartblinds.com"
