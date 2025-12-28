@@ -23,6 +23,7 @@ from .const import (
     CMD_DOWN,
     CMD_STOP,
     CMD_FAV,
+    CMD_FAV2,
 )
 
 _LOGGER = logging.getLogger(__name__)
@@ -48,11 +49,19 @@ def _get_friendly_command_name(command: str) -> str:
 def _sanitize_payload(payload: dict) -> dict:
     """Return a copy of the command payload with sensitive values redacted."""
     try:
+        # Use deepcopy to ensure we don't modify the original payload
         safe_payload = copy.deepcopy(payload) 
+        
+        # The payload keys are the sensitive controller strings
         for controller_id in list(safe_payload.keys()):
+            # Get the list of commands
             commands = safe_payload.pop(controller_id) 
+            
+            # Re-add with a redacted key
             safe_controller_key = f"[REDACTED_CONTROLLER_ID:{controller_id[:4]}...]"
             safe_payload[safe_controller_key] = commands
+            
+            # Now redact the contents of the command list
             for command_data in commands:
                 if "token" in command_data:
                     command_data["token"] = "[REDACTED_TOKEN]"
@@ -88,16 +97,17 @@ class NeoSmartCloudAPI:
         self._client = client
         self._controller_map = {} 
         
+        # Default logging level to Redacted if not specified
         self._log_level = self._options.get(
             "debug_logging_level", "Enable Redacted Payload Debug Logging"
         )
 
-    # ... (All functions from get_user_uuid to _parse_controller_map_from_token are unchanged) ...
     def get_user_uuid(self) -> str | None:
         """Return the user's UUID."""
         return self._user_uuid
 
     def _decode_token(self, token: str, key: str):
+        """Decode a JWT and extract a specific key."""
         try:
             payload_b64 = token.split('.')[1]
             payload_b64 += '=' * (-len(payload_b64) % 4)
@@ -113,6 +123,7 @@ class NeoSmartCloudAPI:
             return None
 
     def _generate_hash(self) -> str:
+        """Generate the 7-digit hash required by the API."""
         try:
             time_ms = str(int(time.time() * 1000))
             hash_string = time_ms[-7:]
@@ -123,6 +134,7 @@ class NeoSmartCloudAPI:
             return str(random.randint(1000000, 9999999))
 
     async def async_login(self) -> None:
+        """Log in to the API and store the auth tokens."""
         _LOGGER.debug("Attempting to log in to Neo Smart Blinds cloud")
         payload = {
             "grant_type": "password",
@@ -153,6 +165,7 @@ class NeoSmartCloudAPI:
             raise
 
     async def async_refresh_token(self) -> bool:
+        """Refresh the access token using the refresh token."""
         _LOGGER.debug("Refreshing Neo cloud access token")
         payload = {
             "grant_type": "refresh_token",
@@ -161,6 +174,7 @@ class NeoSmartCloudAPI:
         }
         headers = {"Origin": "https://app.neosmartblinds.com", "Referer": "https://app.neosmartblinds.com/"}
         try:
+            # Uses shared client to avoid blocking calls
             response = await self._client.post(API_TOKEN_URL, data=payload, headers=headers, timeout=REQUEST_TIMEOUT)
             response.raise_for_status()
             data = response.json()
@@ -180,12 +194,13 @@ class NeoSmartCloudAPI:
             return False
 
     async def _api_request(self, method: str, url: str, **kwargs):
+        """Make an authenticated API request, handling token refresh."""
         if not self._access_token:
             await self.async_login()
         headers = kwargs.get("headers", {})
         headers["Authorization"] = f"Bearer {self._access_token}"
-        headers["Origin"] = "https.app.neosmartblinds.com"
-        headers["Referer"] = "https.app.neosmartblinds.com/"
+        headers["Origin"] = "https://app.neosmartblinds.com"
+        headers["Referer"] = "https://app.neosmartblinds.com/"
         kwargs["headers"] = headers
         try:
             kwargs.setdefault('timeout', REQUEST_TIMEOUT)
@@ -207,6 +222,7 @@ class NeoSmartCloudAPI:
             raise
 
     def _parse_controller_map_from_token(self, access_token: str):
+        """Parse the access token to build the controller UUID-to-String map."""
         try:
             controller_strings = self._decode_token(access_token, "ctrv2")
             if not controller_strings:
@@ -221,7 +237,6 @@ class NeoSmartCloudAPI:
 
     async def async_get_data(self) -> dict:
         """Get all user data (blinds, schedules) from the cloud."""
-        
         url = f"{API_LOCATION_URL}/{self._user_uuid}"
         response = await self._api_request("GET", url)
         data = response.json()
@@ -229,15 +244,12 @@ class NeoSmartCloudAPI:
         if self._log_level == "Enable Full Payload Debug Logging":
             _LOGGER.debug("Full API data payload received (UNREDACTED): %s", data)
         else:
-            # For "Redacted" and "No Logging", we do the same safe thing,
-            # as this payload is too complex to sanitize safely.
             _LOGGER.debug("Full API data payload received")
 
         return data
 
     async def async_send_command(self, controller_id: str, blind_code: str, command: str) -> bool:
         """Send a command to a specific blind."""
-        
         full_id_string = self._controller_map.get(controller_id)
         if not full_id_string:
             _LOGGER.error("No controller string found for UUID %s", controller_id)
@@ -264,14 +276,12 @@ class NeoSmartCloudAPI:
             ]
         }
 
+        # Handle selective debug logging
         if self._log_level == "Enable Full Payload Debug Logging":
             _LOGGER.debug("Sending command to %s with FULL (UNREDACTED) payload: %s", url, payload)
-        
         elif self._log_level == "Enable Redacted Payload Debug Logging":
-            safe_payload = _sanitize_payload(payload)
-            _LOGGER.debug("Sending command to %s with SANITIZED payload: %s", url, safe_payload)
-        
-        else: # This is "No Payload Logging"
+            _LOGGER.debug("Sending command to %s with SANITIZED payload: %s", url, _sanitize_payload(payload))
+        else:
             _LOGGER.debug("Sending command to %s", url) 
 
         try:
@@ -279,13 +289,12 @@ class NeoSmartCloudAPI:
             _LOGGER.info("Command sent successfully")
             return True
         except Exception:
-            # Error logging is always sanitized
-            safe_payload = _sanitize_payload(payload)
-            _LOGGER.error("Failed to send command. Sanitized payload was: %s", safe_payload, exc_info=True)
+            # Error logging is always sanitized for safety
+            _LOGGER.error("Failed to send command. Sanitized payload was: %s", _sanitize_payload(payload), exc_info=True)
             return False
 
     async def async_set_schedule_state(self, schedule_id: str, enabled: bool) -> bool:
-        # ... (rest of the function is unchanged)
+        """Enable or disable a cloud-based schedule."""
         _LOGGER.debug("Setting schedule %s to %s", schedule_id, enabled)
         url = API_SCHEDULE_UPDATE_URL.format(uuid=self._user_uuid, schedule_id=schedule_id)
         payload = {"enabled": enabled} 
@@ -297,7 +306,10 @@ class NeoSmartCloudAPI:
             _LOGGER.error("Failed to set schedule state", exc_info=True)
             return False
 
+# --- PARSER FUNCTIONS ---
+
 def parse_blinds_from_data(data: dict) -> list:
+    """Extract individual blind configurations from the API response."""
     blinds_list = []
     rooms = data.get("rooms", {})
     if not rooms:
@@ -312,23 +324,21 @@ def parse_blinds_from_data(data: dict) -> list:
         for channel, blind in room.get("blinds", {}).items():
             if not blind:
                 continue
-            blind_name = blind.get("name")
             blind_code = f"{room_token}-{channel.zfill(2)}"
-            motor_code = blind.get("motorCode", "unknown") 
-            is_tdbu = blind.get("tdbu", False) 
             blinds_list.append({
                 "unique_id": f"{controller_id}_{blind_code}",
-                "name": blind_name,
+                "name": blind.get("name"),
                 "room_name": room_name,
                 "blind_code": blind_code,
                 "controller_id": controller_id,
                 "has_percent": blind.get("hasPercent", False),
-                "motor_code": motor_code,
-                "is_tdbu": is_tdbu,
+                "motor_code": blind.get("motorCode", "unknown"),
+                "is_tdbu": blind.get("tdbu", False),
             })
     return blinds_list
 
 def parse_schedules_from_data(data: dict) -> list:
+    """Extract cloud-based schedules from the API response."""
     schedules_list = []
     schedules = data.get("schedules", {})
     rooms = data.get("rooms", {})
@@ -358,6 +368,7 @@ def parse_schedules_from_data(data: dict) -> list:
     return schedules_list
 
 def parse_controllers_from_data(data: dict) -> list:
+    """Extract unique controllers from the room configurations."""
     controllers = {}
     rooms = data.get("rooms", {})
     if not rooms:
@@ -371,3 +382,27 @@ def parse_controllers_from_data(data: dict) -> list:
                 "room_name": room.get("name", "Unknown Room")
             }
     return list(controllers.values())
+    
+def parse_rooms_from_data(data: dict) -> list:
+    """Parse the rooms list to create group entities."""
+    rooms_list = []
+    rooms = data.get("rooms", {})
+    if not rooms:
+        return []
+    for room_id, room in rooms.items():
+        controller_id = room.get("controller")
+        room_token = room.get("token")
+        room_name = room.get("name")
+        if not controller_id or not room_token:
+            continue
+        blind_codes = [f"{room_token}-{ch.zfill(2)}" for ch, b in room.get("blinds", {}).items() if b]
+        if not blind_codes:
+            continue
+        rooms_list.append({
+            "unique_id": f"room_{room_id}_{controller_id}",
+            "name": f"Room: {room_name}",
+            "room_name": room_name,
+            "controller_id": controller_id,
+            "blind_codes": blind_codes,
+        })
+    return rooms_list
