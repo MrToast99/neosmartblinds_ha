@@ -56,6 +56,9 @@ class NeoSmartFavoriteButtonBase(ButtonEntity):
 
 class NeoSmartFavorite1Button(NeoSmartFavoriteButtonBase):
     """Representation of a Neo Smart Blind "Favorite 1" Button."""
+    
+    _attr_has_entity_name = True
+    _attr_name = "Favorite 1"  # Becomes "[Device Name] Favorite 1"
 
     def __init__(self, controller: NeoSmartCloudAPI, blind_data: dict):
         """Initialize the Favorite 1 button."""
@@ -73,6 +76,9 @@ class NeoSmartFavorite1Button(NeoSmartFavoriteButtonBase):
 
 class NeoSmartFavorite2Button(NeoSmartFavoriteButtonBase):
     """Representation of a Neo Smart Blind "Favorite 2" Button."""
+    
+    _attr_has_entity_name = True
+    _attr_name = "Favorite 2"  # Becomes "[Device Name] Favorite 2"
 
     def __init__(self, controller: NeoSmartCloudAPI, blind_data: dict):
         """Initialize the Favorite 2 button."""
