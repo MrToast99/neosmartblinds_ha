@@ -199,6 +199,7 @@ class NeoSmartCloudAPI:
             await self.async_login()
         headers = kwargs.get("headers", {})
         headers["Authorization"] = f"Bearer {self._access_token}"
+        # FIXED: Corrected protocol typos from api108.py
         headers["Origin"] = "https://app.neosmartblinds.com"
         headers["Referer"] = "https://app.neosmartblinds.com/"
         kwargs["headers"] = headers
@@ -241,6 +242,7 @@ class NeoSmartCloudAPI:
         response = await self._api_request("GET", url)
         data = response.json()
         
+        # MAINTAINED: Unredacted logging logic
         if self._log_level == "Enable Full Payload Debug Logging":
             _LOGGER.debug("Full API data payload received (UNREDACTED): %s", data)
         else:
@@ -276,12 +278,13 @@ class NeoSmartCloudAPI:
             ]
         }
 
-        # Handle selective debug logging
+        # MAINTAINED: Redacted/Full logging logic
         if self._log_level == "Enable Full Payload Debug Logging":
             _LOGGER.debug("Sending command to %s with FULL (UNREDACTED) payload: %s", url, payload)
         elif self._log_level == "Enable Redacted Payload Debug Logging":
-            _LOGGER.debug("Sending command to %s with SANITIZED payload: %s", url, _sanitize_payload(payload))
-        else:
+            safe_payload = _sanitize_payload(payload)
+            _LOGGER.debug("Sending command to %s with SANITIZED payload: %s", url, safe_payload)
+        else: # This is "No Payload Logging"
             _LOGGER.debug("Sending command to %s", url) 
 
         try:
@@ -289,8 +292,9 @@ class NeoSmartCloudAPI:
             _LOGGER.info("Command sent successfully")
             return True
         except Exception:
-            # Error logging is always sanitized for safety
-            _LOGGER.error("Failed to send command. Sanitized payload was: %s", _sanitize_payload(payload), exc_info=True)
+            # Error logging is always sanitized
+            safe_payload = _sanitize_payload(payload)
+            _LOGGER.error("Failed to send command. Sanitized payload was: %s", safe_payload, exc_info=True)
             return False
 
     async def async_set_schedule_state(self, schedule_id: str, enabled: bool) -> bool:
@@ -309,8 +313,8 @@ class NeoSmartCloudAPI:
 # --- PARSER FUNCTIONS ---
 
 def parse_blinds_from_data(data: dict) -> list:
-    """Extract individual blind configurations from the API response."""
-    blinds_list = []
+    """Extract individual blind configurations with DEDUPLICATION."""
+    blinds_dict = {} # Using a dictionary to prevent duplicate entities
     rooms = data.get("rooms", {})
     if not rooms:
         _LOGGER.warning("No rooms found in API response")
@@ -325,17 +329,21 @@ def parse_blinds_from_data(data: dict) -> list:
             if not blind:
                 continue
             blind_code = f"{room_token}-{channel.zfill(2)}"
-            blinds_list.append({
-                "unique_id": f"{controller_id}_{blind_code}",
-                "name": blind.get("name"),
-                "room_name": room_name,
-                "blind_code": blind_code,
-                "controller_id": controller_id,
-                "has_percent": blind.get("hasPercent", False),
-                "motor_code": blind.get("motorCode", "unknown"),
-                "is_tdbu": blind.get("tdbu", False),
-            })
-    return blinds_list
+            unique_id = f"{controller_id}_{blind_code}"
+            
+            # IMPROVED: Prevent creating duplicate entities for the same blind
+            if unique_id not in blinds_dict:
+                blinds_dict[unique_id] = {
+                    "unique_id": unique_id,
+                    "name": blind.get("name"),
+                    "room_name": room_name,
+                    "blind_code": blind_code,
+                    "controller_id": controller_id,
+                    "has_percent": blind.get("hasPercent", False),
+                    "motor_code": blind.get("motorCode", "unknown"),
+                    "is_tdbu": blind.get("tdbu", False),
+                }
+    return list(blinds_dict.values())
 
 def parse_schedules_from_data(data: dict) -> list:
     """Extract cloud-based schedules from the API response."""
@@ -389,15 +397,19 @@ def parse_rooms_from_data(data: dict) -> list:
     rooms = data.get("rooms", {})
     if not rooms:
         return []
+
     for room_id, room in rooms.items():
         controller_id = room.get("controller")
         room_token = room.get("token")
         room_name = room.get("name")
         if not controller_id or not room_token:
             continue
+            
+        # Get all valid blind codes in this room
         blind_codes = [f"{room_token}-{ch.zfill(2)}" for ch, b in room.get("blinds", {}).items() if b]
         if not blind_codes:
             continue
+
         rooms_list.append({
             "unique_id": f"room_{room_id}_{controller_id}",
             "name": f"Room: {room_name}",
@@ -405,4 +417,5 @@ def parse_rooms_from_data(data: dict) -> list:
             "controller_id": controller_id,
             "blind_codes": blind_codes,
         })
+            
     return rooms_list
