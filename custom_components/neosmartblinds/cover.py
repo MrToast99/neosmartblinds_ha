@@ -68,20 +68,19 @@ class NeoSmartCloudCover(CoverEntity):
     """Representation of an individual Neo Smart Blind (Cloud)."""
     
     _attr_has_entity_name = True 
-    _attr_name = None # This ensures it uses ONLY the Device Name
+    _attr_name = None # Inherit name exactly from the Device (e.g., "Master left")
 
     def __init__(self, controller: NeoSmartCloudAPI, blind_data: dict, account_username: str):
         """Initialize the blind."""
         self._controller = controller
         self._attr_unique_id = blind_data["unique_id"]
-        self._blind_code = blind_code = blind_data["blind_code"]
+        self._blind_code = blind_data["blind_code"]
         self._controller_id = blind_data["controller_id"]
         self._motor_code = blind_data.get("motor_code", "unknown")
 
-        # Set the Device Name to the blind name from the API
         self._attr_device_info = DeviceInfo(
             identifiers={(DOMAIN, self._attr_unique_id)},
-            name=blind_data["name"], 
+            name=blind_data["name"], # The simple name used for the entity
             manufacturer="Neo Smart Blinds",
             model=f"Blind (Motor: {self._motor_code.upper()})",
             via_device=(DOMAIN, self._controller_id) 
@@ -105,8 +104,15 @@ class NeoSmartCloudCover(CoverEntity):
              features |= CoverEntityFeature.SET_POSITION
              
         self._attr_supported_features = features
+        
+        # Initial states - prevents AttributeError on startup
         self._attr_is_closed = None
         self._attr_current_cover_position = None
+        
+    @property
+    def extra_state_attributes(self):
+        """Return the state attributes."""
+        return self._extra_attributes
 
     async def async_close_cover(self, **kwargs):
         """Close the cover."""
@@ -140,18 +146,18 @@ class NeoSmartCloudCover(CoverEntity):
             self.async_write_ha_state()
 
     async def favorite_1(self):
-        """Trigger Favorite 1."""
+        """Trigger Favorite 1 for this blind."""
         await self._controller.async_send_command(self._controller_id, self._blind_code, CMD_FAV)
 
     async def favorite_2(self):
-        """Trigger Favorite 2."""
+        """Trigger Favorite 2 for this blind."""
         await self._controller.async_send_command(self._controller_id, self._blind_code, CMD_FAV2)
 
 
 class NeoSmartRoomCover(CoverEntity):
     """Representation of a Room group of Neo Smart Blinds."""
     
-    # We disable prefixing for rooms so they display as "Room: Dining"
+    # Disable prefixing so the card shows exactly "Room: Dining"
     _attr_has_entity_name = False 
     _attr_icon = "mdi:google-circles-group"
 
@@ -159,7 +165,7 @@ class NeoSmartRoomCover(CoverEntity):
         """Initialize the room group."""
         self._controller = controller
         self._attr_unique_id = room_data["unique_id"]
-        self._attr_name = room_data["name"] # Shows exactly "Room: Dining"
+        self._attr_name = room_data["name"] # e.g., "Room: Dining"
         self._controller_id = room_data["controller_id"]
         self._blind_codes = room_data["blind_codes"]
         
@@ -173,6 +179,7 @@ class NeoSmartRoomCover(CoverEntity):
             | CoverEntityFeature.STOP
         )
 
+        # Initial states
         self._attr_is_closed = None
         self._attr_current_cover_position = None
 
@@ -200,13 +207,13 @@ class NeoSmartRoomCover(CoverEntity):
         self.async_write_ha_state()
 
     async def favorite_1(self):
-        """Trigger Favorite 1 for room."""
+        """Trigger Favorite 1 for all blinds in the room."""
         await self._send_group_command(CMD_FAV)
         self._attr_is_closed = None
         self.async_write_ha_state()
 
     async def favorite_2(self):
-        """Trigger Favorite 2 for room."""
+        """Trigger Favorite 2 for all blinds in the room."""
         await self._send_group_command(CMD_FAV2)
         self._attr_is_closed = None
         self.async_write_ha_state()
