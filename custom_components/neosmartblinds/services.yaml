@@ -1,17 +1,17 @@
 favorite_1:
   name: Favorite 1
-  description: Move the blind to the Favorite 1 preset position.
+  description: Move targeted blinds or room groups to their Favorite 1 preset position.
   target:
     entity:
-      integration: neosmartblinds_ha
+      integration: neosmartblinds
       domain: cover
   icon: "mdi:numeric-1-circle"
 
 favorite_2:
   name: Favorite 2
-  description: Move the blind to the Favorite 2 preset position.
+  description: Move targeted blinds or room groups to their Favorite 2 preset position.
   target:
     entity:
-      integration: neosmartblinds_ha
+      integration: neosmartblinds
       domain: cover
   icon: "mdi:numeric-2-circle"
