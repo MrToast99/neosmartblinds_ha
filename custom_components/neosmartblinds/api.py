@@ -9,7 +9,6 @@ import copy
 
 from homeassistant.core import HomeAssistant
 from homeassistant.const import CONF_USERNAME, CONF_PASSWORD
-from homeassistant.exceptions import ConfigEntryAuthFailed
 from homeassistant.helpers.typing import ConfigType
 
 from .const import (
@@ -73,7 +72,7 @@ def _sanitize_payload(payload: dict) -> dict:
         return {"error": "Payload sanitization failed"}
 
 
-class NeoSmartCloudAuthError(ConfigEntryAuthFailed):
+class NeoSmartCloudAuthError(Exception):
     """Exception for authentication errors."""
 
 class NeoSmartCloudAPI:
@@ -84,13 +83,13 @@ class NeoSmartCloudAPI:
         hass: HomeAssistant, 
         data: dict, 
         client: httpx.AsyncClient, 
-        options: ConfigType = {}
+        options: ConfigType | None = None
     ):
         """Initialize the API client."""
         self.hass = hass
         self._username = data[CONF_USERNAME]
         self._password = data[CONF_PASSWORD]
-        self._options = options
+        self._options = options or {}
         self._access_token = None
         self._refresh_token = None
         self._user_uuid = None 

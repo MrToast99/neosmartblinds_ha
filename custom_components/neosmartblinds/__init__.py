@@ -70,6 +70,9 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
 
     # Register Favorite Services
+    # NOTE: These custom services are largely redundant now that dedicated ButtonEntity
+    # classes exist for favorites. Users can call button.press on the favorite button
+    # entities in automations instead. Consider removing these in a future version.
     async def handle_favorite(call: ServiceCall):
         """Handle favorite service calls."""
         method = "favorite_1" if call.service == "favorite_1" else "favorite_2"
@@ -95,4 +98,8 @@ async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     unload_ok = await hass.config_entries.async_unload_platforms(entry, PLATFORMS)
     if unload_ok:
         hass.data[DOMAIN].pop(entry.entry_id)
+        # Clean up registered services if no other config entries remain
+        if not hass.data[DOMAIN]:
+            hass.services.async_remove(DOMAIN, "favorite_1")
+            hass.services.async_remove(DOMAIN, "favorite_2")
     return unload_ok

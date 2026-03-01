@@ -93,9 +93,6 @@ class NeoSmartCloudConfigFlow(ConfigFlow, domain=DOMAIN):
 class NeoSmartBlindsOptionsFlow(OptionsFlow):
     """Handle an options flow for the integration."""
 
-    def __init__(self, config_entry: ConfigEntry):
-        """Initialize options flow."""
-
     async def async_step_init(self, user_input=None):
         """Manage the options."""
         if user_input is not None:

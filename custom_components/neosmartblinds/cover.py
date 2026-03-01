@@ -1,4 +1,5 @@
 """Support for Neo Smart Blinds (Cloud) covers."""
+import asyncio
 import logging
 from homeassistant.components.cover import (
     CoverEntity,
@@ -69,6 +70,7 @@ class NeoSmartCloudCover(CoverEntity):
     
     _attr_has_entity_name = True 
     _attr_name = None # Inherit name exactly from the Device (e.g., "Master left")
+    _attr_assumed_state = True  # No state feedback from device; commands are fire-and-forget
 
     def __init__(self, controller: NeoSmartCloudAPI, blind_data: dict, account_username: str):
         """Initialize the blind."""
@@ -138,6 +140,8 @@ class NeoSmartCloudCover(CoverEntity):
     async def async_set_cover_position(self, **kwargs):
         """Move the blind to a specific position."""
         position = kwargs[ATTR_POSITION]
+        # Protocol supports positions 01-99; clamp to valid range
+        position = max(1, min(99, position))
         position_cmd = str(position).zfill(2)
         
         if await self._controller.async_send_command(self._controller_id, self._blind_code, position_cmd):
@@ -160,6 +164,7 @@ class NeoSmartRoomCover(CoverEntity):
     # Disable prefixing so the card shows exactly "Room: Dining"
     _attr_has_entity_name = False 
     _attr_icon = "mdi:google-circles-group"
+    _attr_assumed_state = True  # No state feedback from device; commands are fire-and-forget
 
     def __init__(self, controller: NeoSmartCloudAPI, room_data: dict):
         """Initialize the room group."""
@@ -184,9 +189,11 @@ class NeoSmartRoomCover(CoverEntity):
         self._attr_current_cover_position = None
 
     async def _send_group_command(self, command: str):
-        """Send a command to all blinds in the room."""
-        for code in self._blind_codes:
-            await self._controller.async_send_command(self._controller_id, code, command)
+        """Send a command to all blinds in the room concurrently."""
+        await asyncio.gather(*(
+            self._controller.async_send_command(self._controller_id, code, command)
+            for code in self._blind_codes
+        ))
 
     async def async_open_cover(self, **kwargs):
         """Open all blinds in the room."""

@@ -1,4 +1,5 @@
 """Support for Neo Smart Blinds (Cloud) buttons."""
+import asyncio
 import logging
 from homeassistant.components.button import ButtonEntity
 from homeassistant.config_entries import ConfigEntry
@@ -110,9 +111,9 @@ class NeoSmartRoomFavoriteButton(ButtonEntity):
             "Triggering Favorite %s for all blinds in room: %s", 
             self._fav_number, self._attr_name
         )
-        for code in self._blind_codes:
-            await self._controller.async_send_command(
-                self._controller_id, 
-                code, 
-                self._command
+        await asyncio.gather(*(
+            self._controller.async_send_command(
+                self._controller_id, code, self._command
             )
+            for code in self._blind_codes
+        ))
