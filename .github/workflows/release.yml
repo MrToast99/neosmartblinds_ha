@@ -18,7 +18,7 @@ jobs:
       - name: Get version from manifest
         id: version
         run: |
-          version=$(jq -r '.version' custom_components/neosmartblinds_ha/manifest.json)
+          version=$(jq -r '.version' custom_components/neosmartblinds/manifest.json)
           echo "version=$version" >> "$GITHUB_OUTPUT"
 
       - name: Create zip asset
