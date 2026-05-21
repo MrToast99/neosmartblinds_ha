@@ -13,17 +13,20 @@ from homeassistant.helpers.typing import ConfigType
 
 from .const import (
     DOMAIN,
+    API_AUTHORIZE_NATIVE_URL,
     API_TOKEN_URL,
     API_LOCATION_URL,
     API_COMMAND_URL,
     API_SCHEDULE_UPDATE_URL, 
     CLIENT_ID,
+    OAUTH_REDIRECT_URI,
     CMD_UP,
     CMD_DOWN,
     CMD_STOP,
     CMD_FAV,
     CMD_FAV2,
 )
+from .pkce import CODE_CHALLENGE_METHOD, generate_pkce_pair
 
 _LOGGER = logging.getLogger(__name__)
 REQUEST_TIMEOUT = 15.0
@@ -133,17 +136,41 @@ class NeoSmartCloudAPI:
             return str(random.randint(1000000, 9999999))
 
     async def async_login(self) -> None:
-        """Log in to the API and store the auth tokens."""
+        """Log in to the API with PKCE and store the auth tokens."""
         _LOGGER.debug("Attempting to log in to Neo Smart Blinds cloud")
-        payload = {
-            "grant_type": "password",
+        code_verifier, code_challenge = generate_pkce_pair()
+        authorize_payload = {
+            "client_id": CLIENT_ID,
             "username": self._username,
             "password": self._password,
-            "client_id": CLIENT_ID, 
+            "code_challenge": code_challenge,
+            "code_challenge_method": CODE_CHALLENGE_METHOD,
+            "redirect_uri": OAUTH_REDIRECT_URI,
+        }
+        token_payload = {
+            "grant_type": "authorization_code",
+            "client_id": CLIENT_ID,
+            "redirect_uri": OAUTH_REDIRECT_URI,
         }
         headers = {"Origin": "https://app.neosmartblinds.com", "Referer": "https://app.neosmartblinds.com/"}
         try:
-            response = await self._client.post(API_TOKEN_URL, data=payload, headers=headers, timeout=REQUEST_TIMEOUT)
+            authorize_response = await self._client.post(
+                API_AUTHORIZE_NATIVE_URL,
+                json=authorize_payload,
+                headers=headers,
+                timeout=REQUEST_TIMEOUT,
+            )
+            authorize_response.raise_for_status()
+            authorize_data = authorize_response.json()
+            authorization_code = authorize_data.get("code")
+            if not authorization_code:
+                _LOGGER.error("Authorization response missing code")
+                raise NeoSmartCloudAuthError("Login failed, authorization response missing code")
+
+            token_payload["code"] = authorization_code
+            token_payload["code_verifier"] = code_verifier
+
+            response = await self._client.post(API_TOKEN_URL, data=token_payload, headers=headers, timeout=REQUEST_TIMEOUT)
             response.raise_for_status()
             data = response.json()
             if "access_token" not in data or "refresh_token" not in data:
