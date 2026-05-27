@@ -38,6 +38,8 @@ Configuration is done through the Home Assistant UI:
 4.  You will be prompted for your Neo Smart Blinds app **Username (Email)** and **Password**.
 5.  The integration will log in, discover your account, controllers, blinds, and schedules, and create all the corresponding devices and entities.
 
+To test that login is working after installation, add the integration with a Neo Smart Blinds account, confirm that devices and entities are created, restart Home Assistant, and confirm the integration loads again without asking you to re-enter credentials.
+
 ## How It Works
 
 This integration works by polling the official Neo Smart Blinds cloud API.

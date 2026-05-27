@@ -3,6 +3,7 @@
 DOMAIN = "neosmartblinds"
 
 API_BASE_URL = "https://api.neosmartblinds.com"
+API_AUTHORIZE_NATIVE_URL = f"{API_BASE_URL}/oauth/authorize/native"
 API_TOKEN_URL = f"{API_BASE_URL}/oauth/token"
 API_LOCATION_URL = f"{API_BASE_URL}/location" 
 
@@ -22,4 +23,5 @@ CMD_TDBU_MIDDLE_DOWN = "d4"
 CMD_TDBU_LOWER_UP = "u2"
 CMD_TDBU_LOWER_DOWN = "d2"
 
-CLIENT_ID = "mobile"
+CLIENT_ID = "ha_production_client"
+OAUTH_REDIRECT_URI = "https://homeassistant.io/oauth/callback"
