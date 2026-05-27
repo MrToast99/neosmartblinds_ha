@@ -249,7 +249,7 @@ class NeoSmartCloudAPI:
 
         return data
 
-    async def async_send_command(self, controller_id: str, blind_code: str, command: str) -> bool:
+    async def async_send_command(self, controller_id: str, blind_code: str, command: str, motor_code: str) -> bool:
         """Send a command to a specific blind."""
         full_id_string = self._controller_map.get(controller_id)
         if not full_id_string:
@@ -271,7 +271,7 @@ class NeoSmartCloudAPI:
                     "token": token,
                     "command": command,
                     "channel": channel,
-                    "motor": "no",
+                    "motor": motor_code,
                     "hash": hash_string
                 }
             ]

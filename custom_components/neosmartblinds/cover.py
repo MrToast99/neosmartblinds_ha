@@ -118,21 +118,21 @@ class NeoSmartCloudCover(CoverEntity):
 
     async def async_close_cover(self, **kwargs):
         """Close the cover."""
-        if await self._controller.async_send_command(self._controller_id, self._blind_code, CMD_DOWN):
+        if await self._controller.async_send_command(self._controller_id, self._blind_code, CMD_DOWN, self._motor_code):
             self._attr_is_closed = True
             self._attr_current_cover_position = 0
             self.async_write_ha_state()
 
     async def async_open_cover(self, **kwargs):
         """Open the cover."""
-        if await self._controller.async_send_command(self._controller_id, self._blind_code, CMD_UP):
+        if await self._controller.async_send_command(self._controller_id, self._blind_code, CMD_UP, self._motor_code):
             self._attr_is_closed = False
             self._attr_current_cover_position = 100
             self.async_write_ha_state()
 
     async def async_stop_cover(self, **kwargs):
         """Stop the cover."""
-        if await self._controller.async_send_command(self._controller_id, self._blind_code, CMD_STOP):
+        if await self._controller.async_send_command(self._controller_id, self._blind_code, CMD_STOP, self._motor_code):
             self._attr_is_closed = None
             self._attr_current_cover_position = None
             self.async_write_ha_state()
@@ -144,18 +144,18 @@ class NeoSmartCloudCover(CoverEntity):
         position = max(1, min(99, position))
         position_cmd = str(position).zfill(2)
         
-        if await self._controller.async_send_command(self._controller_id, self._blind_code, position_cmd):
+        if await self._controller.async_send_command(self._controller_id, self._blind_code, position_cmd, self._motor_code):
             self._attr_current_cover_position = position
             self._attr_is_closed = position == 0
             self.async_write_ha_state()
 
     async def favorite_1(self):
         """Trigger Favorite 1 for this blind."""
-        await self._controller.async_send_command(self._controller_id, self._blind_code, CMD_FAV)
+        await self._controller.async_send_command(self._controller_id, self._blind_code, CMD_FAV, self._motor_code)
 
     async def favorite_2(self):
         """Trigger Favorite 2 for this blind."""
-        await self._controller.async_send_command(self._controller_id, self._blind_code, CMD_FAV2)
+        await self._controller.async_send_command(self._controller_id, self._blind_code, CMD_FAV2, self._motor_code)
 
 
 class NeoSmartRoomCover(CoverEntity):
@@ -191,7 +191,7 @@ class NeoSmartRoomCover(CoverEntity):
     async def _send_group_command(self, command: str):
         """Send a command to all blinds in the room concurrently."""
         await asyncio.gather(*(
-            self._controller.async_send_command(self._controller_id, code, command)
+            self._controller.async_send_command(self._controller_id, code, command, self._motor_code)
             for code in self._blind_codes
         ))
 

@@ -76,7 +76,8 @@ class NeoSmartBlindFavoriteButton(ButtonEntity):
         await self._controller.async_send_command(
             self._controller_id, 
             self._blind_code, 
-            self._command
+            self._command,
+            self._motor_code
         )
 
 
@@ -113,7 +114,7 @@ class NeoSmartRoomFavoriteButton(ButtonEntity):
         )
         await asyncio.gather(*(
             self._controller.async_send_command(
-                self._controller_id, code, self._command
+                self._controller_id, code, self._command, self._motor_code
             )
             for code in self._blind_codes
         ))
