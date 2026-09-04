@@ -23,7 +23,7 @@ jobs:
 
       - name: Create zip asset
         run: |
-          cd custom_components/neosmartblinds_ha
+          cd custom_components/neosmartblinds
           zip -r ../../neosmartblinds_ha.zip .
           cd ../..
 
