@@ -46,7 +46,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
 
     # 1. Create the top-level "Account" device
     account_username = entry.data[CONF_USERNAME]
-    device_registry.async_get_or_create(
+    account_device = device_registry.async_get_or_create(
         config_entry_id=entry.entry_id,
         identifiers={(DOMAIN, account_username)},
         name=f"Neo Blinds ({account_username})",
@@ -64,7 +64,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
             name=f"Neo Controller ({controller['room_name']})",
             manufacturer="Neo Smart Blinds",
             model="Cloud Controller",
-            via_device=(DOMAIN, account_username) 
+            via_device_id=account_device.id,
         )
     
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)

@@ -10,6 +10,7 @@ from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.entity import DeviceInfo
+from homeassistant.helpers import device_registry as dr
 
 from .const import (
     DOMAIN, 
@@ -36,18 +37,23 @@ async def async_setup_entry(
     entry_data = hass.data[DOMAIN][entry.entry_id]
     controller: NeoSmartCloudAPI = entry_data["api"]
     full_data: dict = entry_data["data"]
-    
+    device_registry = dr.async_get(hass)
+
     entities = []
-    
+
     # 1. Add individual blinds
     blinds = parse_blinds_from_data(full_data)
     if blinds:
         for blind_data in blinds:
+            controller_device = device_registry.async_get_device_by_identifier(
+                (DOMAIN, blind_data["controller_id"]), entry.entry_id
+            )
             entities.append(
                 NeoSmartCloudCover(
-                    controller, 
-                    blind_data, 
-                    entry.data["username"]
+                    controller,
+                    blind_data,
+                    entry.data["username"],
+                    controller_device.id if controller_device else None,
                 )
             )
         
@@ -72,7 +78,13 @@ class NeoSmartCloudCover(CoverEntity):
     _attr_name = None # Inherit name exactly from the Device (e.g., "Master left")
     _attr_assumed_state = True  # No state feedback from device; commands are fire-and-forget
 
-    def __init__(self, controller: NeoSmartCloudAPI, blind_data: dict, account_username: str):
+    def __init__(
+        self,
+        controller: NeoSmartCloudAPI,
+        blind_data: dict,
+        account_username: str,
+        controller_device_id: str | None = None,
+    ):
         """Initialize the blind."""
         self._controller = controller
         self._attr_unique_id = blind_data["unique_id"]
@@ -85,8 +97,9 @@ class NeoSmartCloudCover(CoverEntity):
             name=blind_data["name"], # The simple name used for the entity
             manufacturer="Neo Smart Blinds",
             model=f"Blind (Motor: {self._motor_code.upper()})",
-            via_device=(DOMAIN, self._controller_id) 
         )
+        if controller_device_id:
+            self._attr_device_info["via_device_id"] = controller_device_id
         
         self._extra_attributes = {
             "room_name": blind_data.get("room_name", "Unknown"),
