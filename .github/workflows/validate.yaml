@@ -26,11 +26,14 @@ jobs:
       - uses: home-assistant/actions/hassfest@master
 
   tests:
-    name: Unit tests
+    name: Tests
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with:
           python-version: "3.13"
-      - run: python -m unittest discover -s tests -v
+          cache: pip
+          cache-dependency-path: requirements_test.txt
+      - run: pip install -r requirements_test.txt
+      - run: pytest -v --cov=custom_components.neosmartblinds --cov-report=term-missing --cov-fail-under=95

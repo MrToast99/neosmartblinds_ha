@@ -14,12 +14,14 @@ from .const import DOMAIN
 from .api import (
     NeoSmartCloudAPI,
     NeoSmartCloudAuthError,
-    parse_controllers_from_data
+    parse_controllers_from_data,
+    parse_rooms_from_data,
 )
 from .models import NeoSmartConfigEntry, NeoSmartRuntimeData
 from .sidebar import async_follow_entries, async_update_sidebar_panel
 from .websocket_api import async_register_websocket
 
+ACCOUNT_DEVICE_MODEL = "Cloud Account"
 PLATFORMS: list[Platform] = [Platform.COVER, Platform.SWITCH, Platform.BUTTON]
 CONFIG_SCHEMA = cv.config_entry_only_config_schema(DOMAIN)
 _LOGGER = logging.getLogger(__name__)
@@ -93,14 +95,15 @@ async def async_setup_entry(hass: HomeAssistant, entry: NeoSmartConfigEntry) -> 
         identifiers={(DOMAIN, account_username)},
         name=f"Neo Blinds ({account_username})",
         manufacturer="Neo Smart Blinds",
-        model="Cloud Account",
+        model=ACCOUNT_DEVICE_MODEL,
         entry_type=dr.DeviceEntryType.SERVICE,
     )
 
     # 2. Create the "Controller" devices
     controllers = parse_controllers_from_data(full_data)
+    controller_devices = {}
     for controller in controllers:
-        device_registry.async_get_or_create(
+        controller_devices[controller["id"]] = device_registry.async_get_or_create(
             config_entry_id=entry.entry_id,
             identifiers={(DOMAIN, controller["id"])},
             name=f"Neo Controller ({controller['room_name']})",
@@ -109,6 +112,26 @@ async def async_setup_entry(hass: HomeAssistant, entry: NeoSmartConfigEntry) -> 
             via_device_id=account_device.id,
         )
     
+    # 3. Create a "Room" device for each room, under the controller that serves it. One
+    # controller can serve several rooms, so the room entities (the room cover and its
+    # favorite buttons) live on their own device, and are named after it.
+    for room in parse_rooms_from_data(full_data):
+        controller_device = controller_devices.get(room["controller_id"])
+        device_registry.async_get_or_create(
+            config_entry_id=entry.entry_id,
+            identifiers={(DOMAIN, room["unique_id"])},
+            name=room["name"],
+            manufacturer="Neo Smart Blinds",
+            model="Room",
+            via_device_id=controller_device.id if controller_device else None,
+        )
+
+    # The account device is named after the login, so a changed email leaves the old one
+    # behind. The controllers now point at the new one, so the old one can go.
+    for device in dr.async_entries_for_config_entry(device_registry, entry.entry_id):
+        if device.model == ACCOUNT_DEVICE_MODEL and device.id != account_device.id:
+            device_registry.async_remove_device(device.id)
+
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
 
     entry.async_on_unload(entry.add_update_listener(async_reload_entry))

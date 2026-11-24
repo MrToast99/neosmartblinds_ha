@@ -19,6 +19,14 @@
         "data": {
           "password": "Password"
         }
+      },
+      "reconfigure": {
+        "title": "Change the Neo Smart Blinds login",
+        "description": "Enter the email and password you use in the Neo Smart Blinds app. It has to be the same Neo account this entry was set up with.",
+        "data": {
+          "username": "Username (Email)",
+          "password": "Password"
+        }
       }
     },
     "error": {
@@ -29,7 +37,8 @@
     "abort": {
       "already_configured": "This account is already configured.",
       "reauth_successful": "Signed in again. The integration is reloading.",
-      "wrong_account": "That password belongs to a different Neo account. Use the account this entry was set up with."
+      "reconfigure_successful": "The login was updated. The integration is reloading.",
+      "wrong_account": "That login belongs to a different Neo account. Use the account this entry was set up with."
     }
   },
   "options": {
@@ -43,6 +52,42 @@
           "show_sidebar": "A page with your rooms and blinds in Home Assistant's sidebar. No dashboard needed."
         }
       }
+    }
+  },
+  "entity": {
+    "button": {
+      "favorite_1": {
+        "name": "Favorite 1"
+      },
+      "favorite_2": {
+        "name": "Favorite 2"
+      },
+      "room_favorite_1": {
+        "name": "Favorite 1"
+      },
+      "room_favorite_2": {
+        "name": "Favorite 2"
+      }
+    }
+  },
+  "exceptions": {
+    "controller_not_found": {
+      "message": "The Neo controller for this blind was not found. Reload the integration."
+    },
+    "invalid_blind_code": {
+      "message": "This blind has an unexpected code and can't be controlled."
+    },
+    "login_rejected": {
+      "message": "The Neo login was rejected. Re-authenticate the integration with your current password."
+    },
+    "command_failed": {
+      "message": "The Neo cloud did not accept the command ({reason})."
+    },
+    "schedule_failed": {
+      "message": "The Neo cloud did not accept the schedule change ({reason})."
+    },
+    "group_command_failed": {
+      "message": "{failed} of {total} blinds in the room did not respond. See the log for details."
     }
   }
 }

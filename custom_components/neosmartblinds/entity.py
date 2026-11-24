@@ -8,15 +8,30 @@ from homeassistant.exceptions import HomeAssistantError
 from homeassistant.helpers.entity import Entity
 
 from .api import NeoSmartCloudAPI
+from .const import DOMAIN
 
 
 class NeoSmartEntity(Entity):
-    """Base class: entities here are updated by the commands they send, never polled."""
+    """Base class: entities here are updated by the commands they send, never polled.
+
+    The Neo cloud reports no state, so the only thing that can make an entity unavailable
+    is the login being rejected: until the user signs in again, nothing can be controlled.
+    """
 
     _attr_should_poll = False
 
     def __init__(self, controller: NeoSmartCloudAPI) -> None:
         self._controller = controller
+
+    @property
+    def available(self) -> bool:
+        return not self._controller.auth_failed
+
+    async def async_added_to_hass(self) -> None:
+        await super().async_added_to_hass()
+        self.async_on_remove(
+            self._controller.async_add_auth_listener(self.async_write_ha_state)
+        )
 
 
 async def async_send_to_blinds(
@@ -47,5 +62,10 @@ async def async_send_to_blinds(
     failures = [r for r in results if isinstance(r, Exception)]
     if failures:
         raise HomeAssistantError(
-            f"{len(failures)} of {len(codes)} blinds did not respond: {failures[0]}"
+            translation_domain=DOMAIN,
+            translation_key="group_command_failed",
+            translation_placeholders={
+                "failed": str(len(failures)),
+                "total": str(len(codes)),
+            },
         ) from failures[0]

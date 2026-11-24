@@ -64,11 +64,9 @@ class NeoSmartBlindFavoriteButton(NeoSmartEntity, ButtonEntity):
         self._command = CMD_FAV if fav_number == 1 else CMD_FAV2
         
         self._attr_unique_id = f"{blind_data['unique_id']}_fav_{fav_number}"
-        self._attr_name = f"Favorite {fav_number}"
-        
-        # DISTINCTION: Solid star for 1, Star-Check for 2
-        self._attr_icon = "mdi:star" if fav_number == 1 else "mdi:star-check"
-        
+        # Name and icon come from translations/en.json and icons.json.
+        self._attr_translation_key = f"favorite_{fav_number}"
+
         # Link to the blind device
         self._attr_device_info = DeviceInfo(
             identifiers={(DOMAIN, blind_data["unique_id"])}
@@ -87,8 +85,7 @@ class NeoSmartBlindFavoriteButton(NeoSmartEntity, ButtonEntity):
 class NeoSmartRoomFavoriteButton(NeoSmartEntity, ButtonEntity):
     """Favorite button for a Room group."""
     
-    # Show exactly as "Room: Dining Favorite 1"
-    _attr_has_entity_name = False 
+    _attr_has_entity_name = True
 
     def __init__(self, controller: NeoSmartCloudAPI, room_data: dict, fav_number: int):
         """Initialize the room favorite button."""
@@ -100,21 +97,20 @@ class NeoSmartRoomFavoriteButton(NeoSmartEntity, ButtonEntity):
         self._command = CMD_FAV if fav_number == 1 else CMD_FAV2
         
         self._attr_unique_id = f"{room_data['unique_id']}_fav_{fav_number}"
-        self._attr_name = f"{room_data['name']} Favorite {fav_number}"
-        
-        # Room-specific favorite icons
-        self._attr_icon = "mdi:star-settings" if fav_number == 1 else "mdi:star-cog"
-        
-        # Link to the Controller device
+        self._room_name = room_data["name"]
+        # Name and icon come from translations/en.json and icons.json.
+        self._attr_translation_key = f"room_favorite_{fav_number}"
+
+        # Link to the room's own device, created at setup (see __init__.py)
         self._attr_device_info = DeviceInfo(
-            identifiers={(DOMAIN, self._controller_id)}
+            identifiers={(DOMAIN, room_data["unique_id"])}
         )
 
     async def async_press(self) -> None:
         """Handle the button press for the entire room."""
         _LOGGER.debug(
             "Triggering Favorite %s for all blinds in room: %s", 
-            self._fav_number, self._attr_name
+            self._fav_number, self._room_name
         )
         await async_send_to_blinds(
             self._controller,

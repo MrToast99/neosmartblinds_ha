@@ -8,7 +8,7 @@ import random
 import copy
 from collections.abc import Callable
 
-from homeassistant.core import HomeAssistant
+from homeassistant.core import HomeAssistant, callback
 from homeassistant.const import CONF_USERNAME, CONF_PASSWORD
 from homeassistant.exceptions import HomeAssistantError
 from homeassistant.helpers.typing import ConfigType
@@ -99,6 +99,7 @@ class NeoSmartCloudAPI:
         # for a new password. Set by async_setup_entry once the entry is loaded.
         self.auth_failed_callback: Callable[[], None] | None = None
         self._auth_failed = False
+        self._auth_listeners: list[Callable[[], None]] = []
         self._access_token = None
         self._refresh_token = None
         self._user_uuid = None 
@@ -109,6 +110,37 @@ class NeoSmartCloudAPI:
         self._log_level = self._options.get(
             "debug_logging_level", "Enable Redacted Payload Debug Logging"
         )
+
+    @property
+    def auth_failed(self) -> bool:
+        """True once the saved login was rejected; stays True until the entry reloads."""
+        return self._auth_failed
+
+    @callback
+    def async_add_auth_listener(self, listener: Callable[[], None]) -> Callable[[], None]:
+        """Call listener when the login is rejected. Returns a function that removes it."""
+        self._auth_listeners.append(listener)
+
+        @callback
+        def _remove() -> None:
+            if listener in self._auth_listeners:
+                self._auth_listeners.remove(listener)
+
+        return _remove
+
+    def _mark_auth_failed(self) -> None:
+        """Remember that the login was rejected and tell everyone who asked, once."""
+        if self._auth_failed:
+            return
+        self._auth_failed = True
+        _LOGGER.warning(
+            "The Neo login was rejected; the entities are unavailable until the "
+            "integration is re-authenticated"
+        )
+        for listener in list(self._auth_listeners):
+            listener()
+        if self.auth_failed_callback is not None:
+            self.auth_failed_callback()
 
     def get_user_uuid(self) -> str | None:
         """Return the user's UUID."""
@@ -257,9 +289,7 @@ class NeoSmartCloudAPI:
             response.raise_for_status()
             return response
         except NeoSmartCloudAuthError:
-            self._auth_failed = True
-            if self.auth_failed_callback is not None:
-                self.auth_failed_callback()
+            self._mark_auth_failed()
             raise
         except httpx.HTTPStatusError as err:
             _LOGGER.error("API request failed: %s", err)
@@ -312,13 +342,17 @@ class NeoSmartCloudAPI:
         full_id_string = self._controller_map.get(controller_id)
         if not full_id_string:
             _LOGGER.error("No controller string found for UUID %s", controller_id)
-            raise HomeAssistantError("The Neo controller for this blind was not found. Reload the integration.")
+            raise HomeAssistantError(
+                translation_domain=DOMAIN, translation_key="controller_not_found"
+            )
 
         try:
             token, channel = blind_code.split('-')
         except ValueError as err:
             _LOGGER.error("Invalid blind_code format: %s", blind_code)
-            raise HomeAssistantError("This blind has an unexpected code and can't be controlled.") from err
+            raise HomeAssistantError(
+                translation_domain=DOMAIN, translation_key="invalid_blind_code"
+            ) from err
 
         hash_string = self._generate_hash()
         url = API_COMMAND_URL
@@ -349,14 +383,16 @@ class NeoSmartCloudAPI:
             _LOGGER.info("Command sent successfully")
         except NeoSmartCloudAuthError as err:
             raise HomeAssistantError(
-                "The Neo login was rejected. Re-authenticate the integration with your current password."
+                translation_domain=DOMAIN, translation_key="login_rejected"
             ) from err
         except Exception as err:
             # Error logging is always sanitized
             safe_payload = _sanitize_payload(payload)
             _LOGGER.error("Failed to send command. Sanitized payload was: %s", safe_payload, exc_info=True)
             raise HomeAssistantError(
-                f"The Neo cloud did not accept the command ({self._failure_reason(err)})."
+                translation_domain=DOMAIN,
+                translation_key="command_failed",
+                translation_placeholders={"reason": self._failure_reason(err)},
             ) from err
 
     async def async_set_schedule_state(self, schedule_id: str, enabled: bool) -> None:
@@ -372,12 +408,14 @@ class NeoSmartCloudAPI:
             _LOGGER.info("Schedule state set successfully")
         except NeoSmartCloudAuthError as err:
             raise HomeAssistantError(
-                "The Neo login was rejected. Re-authenticate the integration with your current password."
+                translation_domain=DOMAIN, translation_key="login_rejected"
             ) from err
         except Exception as err:
             _LOGGER.error("Failed to set schedule state", exc_info=True)
             raise HomeAssistantError(
-                f"The Neo cloud did not accept the schedule change ({self._failure_reason(err)})."
+                translation_domain=DOMAIN,
+                translation_key="schedule_failed",
+                translation_placeholders={"reason": self._failure_reason(err)},
             ) from err
 
 # --- PARSER FUNCTIONS ---
@@ -408,6 +446,8 @@ def parse_blinds_from_data(data: dict) -> list:
                     "name": blind.get("name"),
                     "room_id": room_id,
                     "room_name": room_name,
+                    # Same id parse_rooms_from_data gives the room (and so its device).
+                    "room_unique_id": f"room_{room_id}_{controller_id}",
                     "blind_code": blind_code,
                     "controller_id": controller_id,
                     "has_percent": blind.get("hasPercent", False),
@@ -426,6 +466,7 @@ def parse_schedules_from_data(data: dict) -> list:
         return []
     for schedule_id, schedule in schedules.items():
         friendly_name = f"Schedule {schedule_id}"
+        label = friendly_name  # the name without the room, for when it sits on a room's device
         try:
             schedule_time = schedule.get("time", "Unknown Time")
             schedule_cmd = schedule.get("command", "cmd")
@@ -434,7 +475,8 @@ def parse_schedules_from_data(data: dict) -> list:
             if room_id and room_id in rooms:
                 room_name = rooms[room_id].get("name", room_name)
             command_name = _get_friendly_command_name(schedule_cmd)
-            friendly_name = f"{room_name} {command_name} at {schedule_time}"
+            label = f"{command_name} at {schedule_time}"
+            friendly_name = f"{room_name} {label}"
         except Exception as e:
             _LOGGER.warning("Could not parse friendly name for schedule %s: %s", schedule_id, e)
         schedule_data = schedule.copy()
@@ -442,7 +484,10 @@ def parse_schedules_from_data(data: dict) -> list:
         if room_id and room_id in rooms:
             schedule_data["room_name"] = rooms[room_id].get("name", "Unknown")
             schedule_data["controller_id"] = rooms[room_id].get("controller")
+            # Same id parse_rooms_from_data gives that room (and so its device).
+            schedule_data["room_unique_id"] = f"room_{room_id}_{schedule_data['controller_id']}"
         schedule_data["name"] = friendly_name
+        schedule_data["label"] = label
         schedules_list.append(schedule_data)
     return schedules_list
 

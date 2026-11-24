@@ -3,19 +3,31 @@
 All notable changes to this project are listed here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and versions match the release tags.
 
-## [1.2.2] - pending
+## [1.2.2] - 2026-11-24
 
-Failed commands now report an error, plus groundwork from the Home Assistant quality scale.
+Failed commands report an error, a changed login can be fixed in place, and a round of groundwork from the Home Assistant quality scale.
+
+### Added
+- **A device for each room**, so the rooms are listed on the integration page. A Neo controller can serve several rooms, so the room cover and its favorite buttons now live on their own "Room: Dining" device, under the controller, instead of all sharing the controller's device. Their names don't change (still "Room: Dining" and "Room: Dining Favorite 1"), and neither do entity IDs or history; existing entities move to the new devices when the integration reloads.
+- **Blinds are listed under their room's device** instead of directly under the controller (Controller > Room > Blind), so the devices list says which room each blind is in.
+- **Schedule switches sit on their room's device**, and are named like "Room: Dining Open at 7:00" instead of "Neo Controller (Master) Dining Open at 7:00". Entity IDs and history are unchanged, but a dashboard or automation that refers to the friendly name needs updating. A schedule whose room has no blinds stays on the controller.
+- **Reconfigure**: change the email or password of an account from its **⋮** menu, without removing it. It has to be the same Neo account, and the old account device is replaced when the email changes.
+- **Download diagnostics**: a summary for bug reports with the login, tokens, controller IDs and all names left out.
+- **Unavailable while signed out**: when the login is rejected, the account's entities show as unavailable until it is re-authenticated, and a single warning is logged.
+- Translated error messages and entity names, and icons from `icons.json`.
+- README sections for the actions, removing the integration, changing the login and diagnostics.
+- Tests (159, covering about 99% of the integration) for the config flow, setup, entities, the cloud client, diagnostics, the card and the sidebar, run in CI with `pytest`.
 
 ### Changed
 - **Failed commands are reported.** When the Neo cloud doesn't accept a command or a schedule change, Home Assistant now shows an error and the entity keeps its previous state. Before, the failure was only written to the log and the entity looked as if it had worked. A room command tries every blind and says how many didn't respond.
+- Covers are now blind-type covers (`device_class: blind`).
 - The two `favorite` actions are registered once when Home Assistant starts, instead of once per account.
 - Commands are sent to the Neo cloud one entity at a time (`PARALLEL_UPDATES = 1`), so a burst of commands doesn't flood it.
 - Account data is kept in the config entry's `runtime_data` instead of `hass.data`.
 - Entities share a base class (`entity.py`) and are marked as never polled.
 
-### Added
-- README sections for the actions and for removing the integration.
+### Fixed
+- Adding an account that is already set up showed "Failed to connect" instead of "This account is already configured".
 
 ## [1.2.1] - 2026-11-23
 

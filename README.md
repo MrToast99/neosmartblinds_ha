@@ -50,18 +50,24 @@ Open the integration and choose **Configure** to change:
 
 Changing an option reloads the integration.
 
+### Changing the login
+
+* **You changed your Neo password:** Home Assistant asks for the new one, see [Troubleshooting](#troubleshooting).
+* **You want to use a different email for the same Neo account:** open the integration, click the **⋮** menu next to the account, and choose **Reconfigure**. Enter the email and password. It has to be the same Neo account; to use a different account, add it as another one.
+
 ## What you get
 
 | Device | Entities |
 | --- | --- |
 | **Account** | The top-level device for your login. |
-| **Controller** (one per Neo controller, named after its room) | A cover and two favorite buttons for each room ("Room: Dining", "Room: Dining Favorite 1"), plus a switch for each schedule. |
-| **Blind** (one per blind, under its controller) | A cover, plus "Favorite 1" and "Favorite 2" buttons. |
+| **Controller** (one per Neo controller) | Nothing of its own: it is the parent of its rooms and blinds. The Neo cloud doesn't name controllers, so it is named after one of the rooms it serves, for example "Neo Controller (Master)". One controller can serve several rooms. |
+| **Room** (one per room, under its controller) | A cover for the whole room ("Room: Dining"), two favorite buttons ("Room: Dining Favorite 1"), and a switch for each of the room's schedules ("Room: Dining Open at 7:00"). |
+| **Blind** (one per blind, under its room) | A cover, plus "Favorite 1" and "Favorite 2" buttons. |
 
-* **Blind covers** support open, close and stop. A position slider is added for motors that report percent support.
+* **Blind covers** are blind-type covers and support open, close and stop. A position slider is added for motors that report percent support.
 * **Room covers** open, close or stop every blind in the room at once. They have no position of their own; use the blinds or the card's "set position" slider for that.
 * **Favorite buttons** are created for every blind and room. They only do something on motors that have a favorite position set.
-* **Schedule switches** are named from the room, action and time, for example "Master Favorite 1 at 7:00". Turning one on or off enables or disables that schedule in the cloud.
+* **Schedule switches** are named from the room, action and time, for example "Room: Master Favorite 1 at 7:00". Turning one on or off enables or disables that schedule in the cloud.
 
 ### Actions
 
@@ -81,6 +87,14 @@ target:
 The favorite buttons do the same thing and are easier to use in dashboards and automations (`button.press`). The usual cover actions (`cover.open_cover`, `cover.close_cover`, `cover.stop_cover`, `cover.set_cover_position`) work too.
 
 If the Neo cloud doesn't accept a command, the action fails with an error message, so you see it in the interface and automations can react to it. For a room, every blind is tried, and the error says how many didn't respond.
+
+### When the login stops working
+
+If the Neo login is rejected, for example after a password change, every entity of that account shows as **unavailable** and Home Assistant asks you to sign in again (see [Troubleshooting](#troubleshooting)). Everything comes back once you do.
+
+### Diagnostics
+
+On the integration's page, **⋮ > Download diagnostics** saves a summary for bug reports: how many rooms, blinds and schedules there are, and which motor types the blinds report. It leaves out your email, password, tokens, controller IDs and every name.
 
 ### How state works
 

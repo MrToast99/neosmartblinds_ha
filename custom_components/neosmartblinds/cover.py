@@ -1,6 +1,7 @@
 """Support for Neo Smart Blinds (Cloud) covers."""
 import logging
 from homeassistant.components.cover import (
+    CoverDeviceClass,
     CoverEntity,
     CoverEntityFeature,
     ATTR_POSITION,
@@ -47,7 +48,11 @@ async def async_setup_entry(
     blinds = parse_blinds_from_data(full_data)
     if blinds:
         for blind_data in blinds:
-            controller_device = device_registry.async_get_device_by_identifier(
+            # A blind sits under its room's device (Controller > Room > Blind). Without
+            # one it falls back to the controller.
+            parent_device = device_registry.async_get_device_by_identifier(
+                (DOMAIN, blind_data["room_unique_id"]), entry.entry_id
+            ) or device_registry.async_get_device_by_identifier(
                 (DOMAIN, blind_data["controller_id"]), entry.entry_id
             )
             entities.append(
@@ -55,7 +60,7 @@ async def async_setup_entry(
                     controller,
                     blind_data,
                     entry.data["username"],
-                    controller_device.id if controller_device else None,
+                    parent_device.id if parent_device else None,
                 )
             )
 
@@ -78,6 +83,7 @@ class NeoSmartCloudCover(NeoSmartEntity, CoverEntity):
 
     _attr_has_entity_name = True
     _attr_name = None # Inherit name exactly from the Device (e.g., "Master left")
+    _attr_device_class = CoverDeviceClass.BLIND
     _attr_assumed_state = True  # No state feedback from device; commands are fire-and-forget
 
     def __init__(
@@ -85,7 +91,7 @@ class NeoSmartCloudCover(NeoSmartEntity, CoverEntity):
         controller: NeoSmartCloudAPI,
         blind_data: dict,
         account_username: str,
-        controller_device_id: str | None = None,
+        parent_device_id: str | None = None,
     ):
         """Initialize the blind."""
         super().__init__(controller)
@@ -100,8 +106,8 @@ class NeoSmartCloudCover(NeoSmartEntity, CoverEntity):
             manufacturer="Neo Smart Blinds",
             model=f"Blind (Motor: {self._motor_code.upper()})",
         )
-        if controller_device_id:
-            self._attr_device_info["via_device_id"] = controller_device_id
+        if parent_device_id:
+            self._attr_device_info["via_device_id"] = parent_device_id
 
         self._extra_attributes = {
             "room_name": blind_data.get("room_name", "Unknown"),
@@ -180,22 +186,24 @@ class NeoSmartCloudCover(NeoSmartEntity, CoverEntity):
 class NeoSmartRoomCover(NeoSmartEntity, CoverEntity):
     """Representation of a Room group of Neo Smart Blinds."""
 
-    # Disable prefixing so the card shows exactly "Room: Dining"
-    _attr_has_entity_name = False
-    _attr_icon = "mdi:google-circles-group"
+    # The main entity of the room's own device ("Room: Dining"), so it takes that name.
+    _attr_has_entity_name = True
+    _attr_name = None
+    _attr_translation_key = "room"  # for the icon
+    _attr_device_class = CoverDeviceClass.BLIND
     _attr_assumed_state = True  # No state feedback from device; commands are fire-and-forget
 
     def __init__(self, controller: NeoSmartCloudAPI, room_data: dict):
         """Initialize the room group."""
         super().__init__(controller)
         self._attr_unique_id = room_data["unique_id"]
-        self._attr_name = room_data["name"] # e.g., "Room: Dining"
         self._controller_id = room_data["controller_id"]
         self._blind_codes = room_data["blind_codes"]
         self._motor_codes = room_data.get("motor_codes", {})
 
+        # The room's own device, created at setup (see __init__.py).
         self._attr_device_info = DeviceInfo(
-            identifiers={(DOMAIN, self._controller_id)}
+            identifiers={(DOMAIN, self._attr_unique_id)}
         )
 
         self._attr_supported_features = (

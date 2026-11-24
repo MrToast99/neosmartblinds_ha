@@ -1,0 +1,4 @@
+# Test dependencies. Run `pytest` on Linux, macOS or WSL: Home Assistant's test plugin
+# doesn't start on native Windows. The plugin pulls in Home Assistant itself, so pin it to the release
+# you want to test against, for example: pytest-homeassistant-custom-component==0.13.x
+pytest-homeassistant-custom-component

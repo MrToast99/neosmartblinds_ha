@@ -6,7 +6,7 @@ from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.entity import DeviceInfo
 
 from .const import DOMAIN
-from .api import NeoSmartCloudAPI, parse_schedules_from_data
+from .api import NeoSmartCloudAPI, parse_rooms_from_data, parse_schedules_from_data
 from .entity import NeoSmartEntity
 from .models import NeoSmartConfigEntry
 
@@ -29,11 +29,14 @@ async def async_setup_entry(
         _LOGGER.info("Schedule setup: No schedules found.")
         return
 
+    # Schedules sit on their room's device. A room with no blinds has no device, so its
+    # schedules stay on the controller.
+    room_devices = {room["unique_id"] for room in parse_rooms_from_data(full_data)}
     entities = [
         NeoSmartScheduleSwitch(
             controller=controller,
             schedule_data=schedule,
-            account_username=entry.data["username"] # Pass this for via_device
+            room_devices=room_devices,
         )
         for schedule in schedules
     ]
@@ -43,9 +46,10 @@ class NeoSmartScheduleSwitch(NeoSmartEntity, SwitchEntity):
     """Representation of a Neo Smart Blind Schedule Switch."""
 
     _attr_has_entity_name = True
-    _attr_icon = "mdi:calendar-clock"
+    # Only the icon is translated; the name is built from the room, action and time.
+    _attr_translation_key = "schedule"
 
-    def __init__(self, controller: NeoSmartCloudAPI, schedule_data: dict, account_username: str):
+    def __init__(self, controller: NeoSmartCloudAPI, schedule_data: dict, room_devices: set[str]):
         """Initialize the schedule switch."""
         super().__init__(controller)
         self._schedule_id = schedule_data["id"]
@@ -53,13 +57,19 @@ class NeoSmartScheduleSwitch(NeoSmartEntity, SwitchEntity):
         self._room_name = schedule_data.get("room_name", "Unknown")
         
         self._attr_unique_id = self._schedule_id
-        self._attr_name = schedule_data.get("name") # Name is now pre-built
         self._attr_is_on = schedule_data.get("enabled", False)
 
-        if self._controller_id:
-            self._attr_device_info = DeviceInfo(
-                identifiers={(DOMAIN, self._controller_id)}
-            )
+        room_unique_id = schedule_data.get("room_unique_id")
+        if room_unique_id in room_devices:
+            # On the room's device the name needs no room: "Room: Dining Open at 7:00".
+            self._attr_name = schedule_data.get("label")
+            self._attr_device_info = DeviceInfo(identifiers={(DOMAIN, room_unique_id)})
+        else:
+            self._attr_name = schedule_data.get("name") # Name is now pre-built
+            if self._controller_id:
+                self._attr_device_info = DeviceInfo(
+                    identifiers={(DOMAIN, self._controller_id)}
+                )
 
     @property
     def extra_state_attributes(self):

@@ -1,4 +1,30 @@
 {
+  "entity": {
+    "button": {
+      "favorite_1": {
+        "default": "mdi:star"
+      },
+      "favorite_2": {
+        "default": "mdi:star-check"
+      },
+      "room_favorite_1": {
+        "default": "mdi:star-settings"
+      },
+      "room_favorite_2": {
+        "default": "mdi:star-cog"
+      }
+    },
+    "cover": {
+      "room": {
+        "default": "mdi:google-circles-group"
+      }
+    },
+    "switch": {
+      "schedule": {
+        "default": "mdi:calendar-clock"
+      }
+    }
+  },
   "services": {
     "favorite_1": {
       "service": "mdi:numeric-1-circle"
