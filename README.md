@@ -11,6 +11,8 @@ Control your [Neo Smart Blinds](https://neosmartblinds.com/) from Home Assistant
 * **Schedule switches:** turn the schedules from the Neo app on or off.
 * **Dashboard card and sidebar page:** room tiles laid out like the Neo app (see [Dashboard card](#dashboard-card)).
 
+![The Neo Smart Blinds card: one tile per room with open, stop, close, two favorites and a position slider.](https://raw.githubusercontent.com/MrToast99/NeoSmartBlinds_HA/main/docs/images/card-overview.png)
+
 > **Cloud only.** This works only with blinds already set up in the Neo Smart Blinds app, and it needs an internet connection. There is no local control.
 
 ## Installation
@@ -85,16 +87,25 @@ start_expanded: false      # optional, open every room's details at first
 
 Each room tile has open, stop, close, Favorite 1, Favorite 2 and a "set position" slider for the whole room. Expand a room to control each blind on its own and to switch its schedules on or off.
 
+| Expanded room | Dark theme |
+| --- | --- |
+| ![A room expanded to show each blind with its own controls and position slider, and the room's schedule switches.](https://raw.githubusercontent.com/MrToast99/NeoSmartBlinds_HA/main/docs/images/card-room-expanded.png) | ![The card in a dark Home Assistant theme.](https://raw.githubusercontent.com/MrToast99/NeoSmartBlinds_HA/main/docs/images/card-overview-dark.png) |
+
+The card follows your Home Assistant theme. The pictures show sample rooms and blinds, not a real account.
+
 If your dashboards are in YAML mode, resources can't be written for you, so the card is loaded on every page instead.
 
 ### Sidebar page
 
 The same card is also a page of its own in Home Assistant's sidebar, with no dashboard needed. It is on by default for new accounts. Accounts added before this option existed keep it off until you turn on **Show Neo Blinds in the sidebar** under **Configure**.
 
+![The Neo Blinds page in Home Assistant, with a title bar and the room tiles.](https://raw.githubusercontent.com/MrToast99/NeoSmartBlinds_HA/main/docs/images/sidebar-page.png)
+
 ## Troubleshooting
 
 * **Controls do nothing, or you see an error in the log:** check that the same action works in the Neo Smart Blinds app, then reload the integration.
-* **The login fails:** use the email and password from the Neo Smart Blinds app. If you changed your password there, remove the integration and add it again.
+* **The login fails:** use the email and password from the Neo Smart Blinds app.
+* **You changed your Neo password:** Home Assistant shows a "Reconfigure" / "Re-authenticate" prompt on the integration (**Settings > Devices & Services**). Enter the new password there. There is no need to remove the integration, and your entities and dashboards stay as they are. The password has to belong to the same Neo account.
 * **The card says the integration isn't loaded:** the integration failed to start. Check **Settings > System > Logs** for `neosmartblinds`.
 * **A bug or a question:** [open an issue](https://github.com/MrToast99/NeoSmartBlinds_HA/issues) and include the Home Assistant version, the integration version and the relevant log lines.
 

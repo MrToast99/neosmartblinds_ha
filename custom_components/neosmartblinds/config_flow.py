@@ -1,8 +1,18 @@
 """Config flow for Neo Smart Blinds (Cloud)."""
-import voluptuous as vol
-import logging
+from __future__ import annotations
 
-from homeassistant.config_entries import ConfigFlow, ConfigEntry, OptionsFlow
+from collections.abc import Mapping
+import logging
+from typing import Any
+
+import voluptuous as vol
+
+from homeassistant.config_entries import (
+    ConfigEntry,
+    ConfigFlow,
+    ConfigFlowResult,
+    OptionsFlow,
+)
 from homeassistant.core import callback
 from homeassistant.const import CONF_USERNAME, CONF_PASSWORD
 import homeassistant.helpers.config_validation as cv
@@ -47,21 +57,7 @@ class NeoSmartCloudConfigFlow(ConfigFlow, domain=DOMAIN):
             credentials = {CONF_USERNAME: username, CONF_PASSWORD: password}
 
             try:
-                # Test credentials
-                client = get_async_client(self.hass, verify_ssl=True)
-
-                # Pass empty options dict, as API now expects it
-                api = NeoSmartCloudAPI(
-                    self.hass,
-                    credentials,
-                    client,
-                    options={}
-                )
-                await api.async_login()
-                
-                user_uuid = api.get_user_uuid()
-                if not user_uuid:
-                     raise NeoSmartCloudAuthError("Could not parse user ID from token")
+                user_uuid = await self._async_validate_login(credentials)
 
                 await self.async_set_unique_id(user_uuid)
                 self._abort_if_unique_id_configured()
@@ -86,6 +82,59 @@ class NeoSmartCloudConfigFlow(ConfigFlow, domain=DOMAIN):
                 vol.Required(CONF_PASSWORD): str,
                 vol.Required(CONF_SHOW_SIDEBAR, default=True): bool,
             }),
+            errors=errors,
+        )
+
+    async def _async_validate_login(self, credentials: dict) -> str:
+        """Sign in with the credentials and return the account's user ID.
+
+        Raises NeoSmartCloudAuthError for a rejected login; anything else is a
+        connection problem.
+        """
+        client = get_async_client(self.hass, verify_ssl=True)
+        api = NeoSmartCloudAPI(self.hass, credentials, client, options={})
+        await api.async_login()
+
+        user_uuid = api.get_user_uuid()
+        if not user_uuid:
+            raise NeoSmartCloudAuthError("Could not parse user ID from token")
+        return user_uuid
+
+    async def async_step_reauth(self, entry_data: Mapping[str, Any]) -> ConfigFlowResult:
+        """The stored login stopped working (usually a password change)."""
+        return await self.async_step_reauth_confirm()
+
+    async def async_step_reauth_confirm(
+        self, user_input: dict[str, Any] | None = None
+    ) -> ConfigFlowResult:
+        """Ask for the new password and check it before saving."""
+        entry = self._get_reauth_entry()
+        errors: dict[str, str] = {}
+
+        if user_input is not None:
+            credentials = {
+                CONF_USERNAME: entry.data[CONF_USERNAME],
+                CONF_PASSWORD: user_input[CONF_PASSWORD],
+            }
+            try:
+                user_uuid = await self._async_validate_login(credentials)
+            except NeoSmartCloudAuthError:
+                errors["base"] = "invalid_auth"
+            except Exception:
+                _LOGGER.error("Failed to connect to Neo cloud API", exc_info=True)
+                errors["base"] = "cannot_connect"
+            else:
+                if entry.unique_id and entry.unique_id != user_uuid:
+                    return self.async_abort(reason="wrong_account")
+                # Reloads the entry, which signs in with the new password.
+                return self.async_update_reload_and_abort(
+                    entry, data_updates={CONF_PASSWORD: user_input[CONF_PASSWORD]}
+                )
+
+        return self.async_show_form(
+            step_id="reauth_confirm",
+            data_schema=vol.Schema({vol.Required(CONF_PASSWORD): str}),
+            description_placeholders={"username": entry.data[CONF_USERNAME]},
             errors=errors,
         )
 

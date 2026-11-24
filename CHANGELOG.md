@@ -3,6 +3,18 @@
 All notable changes to this project are listed here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and versions match the release tags.
 
+## [1.2.1] - 2026-11-23
+
+Reauthentication after a password change, and sample images in the README.
+
+### Added
+- **Reauthentication**: if the Neo password changes, Home Assistant now asks for the new one (a "Reconfigure/Re-authenticate" prompt on the integration) instead of making you remove and add the integration again. It starts at setup and also when a running integration finds its login rejected. The new password must belong to the same Neo account.
+- Sample dashboard card and sidebar page images in the README.
+
+### Changed
+- When an access token can't be refreshed, the integration now signs in again with the saved password instead of failing every command until the next restart.
+- A Neo cloud outage (server errors, no connection) while loading is no longer treated as a wrong password, and the integration retries on its own instead of staying failed.
+
 ## [1.2.0] - 2026-11-23
 
 Marketplace support, a dashboard card and sidebar page, and fixes for room controls and the options dialog. Requires Home Assistant 2026.11 or newer.
@@ -111,6 +123,7 @@ Versions before 1.2.0 are summarised from their GitHub release titles and notes,
 so those entries are less detailed than the current ones.
 -->
 
+[1.2.1]: https://github.com/MrToast99/NeoSmartBlinds_HA/compare/v1.2.0...v1.2.1
 [1.2.0]: https://github.com/MrToast99/NeoSmartBlinds_HA/compare/v1.1.3...v1.2.0
 [1.1.3]: https://github.com/MrToast99/NeoSmartBlinds_HA/compare/v1.1.2...v1.1.3
 [1.1.2]: https://github.com/MrToast99/NeoSmartBlinds_HA/compare/v1.1.1...v1.1.2

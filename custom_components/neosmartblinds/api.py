@@ -5,7 +5,8 @@ import base64
 import json
 import time
 import random 
-import copy   
+import copy
+from collections.abc import Callable
 
 from homeassistant.core import HomeAssistant
 from homeassistant.const import CONF_USERNAME, CONF_PASSWORD
@@ -93,6 +94,10 @@ class NeoSmartCloudAPI:
         self._username = data[CONF_USERNAME]
         self._password = data[CONF_PASSWORD]
         self._options = options or {}
+        # Called (once) when the stored login stops working, so the integration can ask
+        # for a new password. Set by async_setup_entry once the entry is loaded.
+        self.auth_failed_callback: Callable[[], None] | None = None
+        self._auth_failed = False
         self._access_token = None
         self._refresh_token = None
         self._user_uuid = None 
@@ -185,7 +190,10 @@ class NeoSmartCloudAPI:
             _LOGGER.info("Successfully logged in to Neo cloud")
         except httpx.HTTPStatusError as err:
             _LOGGER.error("Login failed: %s", err)
-            raise NeoSmartCloudAuthError("Login failed, check credentials")
+            if err.response.status_code >= 500:
+                # The Neo cloud is having trouble; that says nothing about the password.
+                raise
+            raise NeoSmartCloudAuthError("Login failed, check credentials") from err
         except Exception as err:
             _LOGGER.error("Login request failed: %s", err)
             raise
@@ -221,26 +229,37 @@ class NeoSmartCloudAPI:
 
     async def _api_request(self, method: str, url: str, **kwargs):
         """Make an authenticated API request, handling token refresh."""
-        if not self._access_token:
-            await self.async_login()
+        if self._auth_failed:
+            # The password was already rejected; don't hammer the login with it.
+            raise NeoSmartCloudAuthError("Stored login was rejected, reauthentication needed")
         headers = kwargs.get("headers", {})
-        headers["Authorization"] = f"Bearer {self._access_token}"
         # FIXED: Corrected protocol typos from api108.py
         headers["Origin"] = "https://app.neosmartblinds.com"
         headers["Referer"] = "https://app.neosmartblinds.com/"
         kwargs["headers"] = headers
         try:
+            if not self._access_token:
+                await self.async_login()
+            headers["Authorization"] = f"Bearer {self._access_token}"
             kwargs.setdefault('timeout', REQUEST_TIMEOUT)
             response = await self._client.request(method, url, **kwargs)
             if response.status_code == 401:
                 _LOGGER.debug("Token expired, attempting refresh")
                 if not await self.async_refresh_token():
-                    raise NeoSmartCloudAuthError("Token refresh failed")
+                    # The refresh token has expired or was revoked (a password change
+                    # does that). Sign in again with the stored password; if that is
+                    # rejected too, async_login raises NeoSmartCloudAuthError.
+                    await self.async_login()
                 headers["Authorization"] = f"Bearer {self._access_token}"
                 kwargs["headers"] = headers
                 response = await self._client.request(method, url, **kwargs)
             response.raise_for_status()
             return response
+        except NeoSmartCloudAuthError:
+            self._auth_failed = True
+            if self.auth_failed_callback is not None:
+                self.auth_failed_callback()
+            raise
         except httpx.HTTPStatusError as err:
             _LOGGER.error("API request failed: %s", err)
             raise

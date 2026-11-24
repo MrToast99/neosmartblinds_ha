@@ -3,7 +3,7 @@ import logging
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import CONF_USERNAME, EVENT_HOMEASSISTANT_STARTED, Platform
 from homeassistant.core import CoreState, Event, HomeAssistant, ServiceCall
-from homeassistant.exceptions import ConfigEntryAuthFailed
+from homeassistant.exceptions import ConfigEntryAuthFailed, ConfigEntryNotReady
 from homeassistant.helpers import config_validation as cv
 from homeassistant.helpers import device_registry as dr, entity_platform
 from homeassistant.helpers.httpx_client import get_async_client
@@ -60,11 +60,16 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         await cloud_api.async_login()
         full_data = await cloud_api.async_get_data()
     except NeoSmartCloudAuthError as err:
+        # Home Assistant starts the reauth flow, which asks for the new password.
         raise ConfigEntryAuthFailed from err
     except Exception as err:
-        _LOGGER.error("Failed to login and fetch data: %s", err)
-        return False
-        
+        # The cloud is unreachable or erroring; Home Assistant retries later.
+        raise ConfigEntryNotReady(f"Could not reach the Neo cloud: {err}") from err
+
+    # If the password stops working later (for example it was changed in the Neo app),
+    # ask for a new one instead of failing every command from now on.
+    cloud_api.auth_failed_callback = lambda: entry.async_start_reauth(hass)
+
     hass.data[DOMAIN][entry.entry_id] = {"api": cloud_api, "data": full_data}
 
     device_registry = dr.async_get(hass)
