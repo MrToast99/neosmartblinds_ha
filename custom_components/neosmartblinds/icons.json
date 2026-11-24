@@ -1,0 +1,10 @@
+{
+  "services": {
+    "favorite_1": {
+      "service": "mdi:numeric-1-circle"
+    },
+    "favorite_2": {
+      "service": "mdi:numeric-2-circle"
+    }
+  }
+}

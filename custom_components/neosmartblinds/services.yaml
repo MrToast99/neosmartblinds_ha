@@ -5,7 +5,6 @@ favorite_1:
     entity:
       integration: neosmartblinds
       domain: cover
-  icon: "mdi:numeric-1-circle"
 
 favorite_2:
   name: Favorite 2
@@ -14,4 +13,3 @@ favorite_2:
     entity:
       integration: neosmartblinds
       domain: cover
-  icon: "mdi:numeric-2-circle"

@@ -101,4 +101,5 @@ The same card is also a page of its own in Home Assistant's sidebar, with no das
 ## Credits
 
 * Original code by [@MrToast99](https://github.com/MrToast99).
+* Released under the [MIT License](LICENSE).
 * This is an unofficial, community-made integration. It is not affiliated with, endorsed by or supported by Neo Smart Blinds. The Neo Smart Blinds name and logo are trademarks of their owner and are used here only to identify the product this integration works with.
