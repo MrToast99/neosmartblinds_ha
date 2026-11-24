@@ -1,11 +1,11 @@
 """The Neo Smart Blinds (Cloud) integration."""
 import logging
-from homeassistant.config_entries import ConfigEntry
+from homeassistant.components.cover import DOMAIN as COVER_DOMAIN
 from homeassistant.const import CONF_USERNAME, EVENT_HOMEASSISTANT_STARTED, Platform
-from homeassistant.core import CoreState, Event, HomeAssistant, ServiceCall
+from homeassistant.core import CoreState, Event, HomeAssistant
 from homeassistant.exceptions import ConfigEntryAuthFailed, ConfigEntryNotReady
 from homeassistant.helpers import config_validation as cv
-from homeassistant.helpers import device_registry as dr, entity_platform
+from homeassistant.helpers import device_registry as dr, service
 from homeassistant.helpers.httpx_client import get_async_client
 from homeassistant.helpers.typing import ConfigType
 
@@ -16,6 +16,7 @@ from .api import (
     NeoSmartCloudAuthError,
     parse_controllers_from_data
 )
+from .models import NeoSmartConfigEntry, NeoSmartRuntimeData
 from .sidebar import async_follow_entries, async_update_sidebar_panel
 from .websocket_api import async_register_websocket
 
@@ -27,6 +28,18 @@ _LOGGER = logging.getLogger(__name__)
 async def async_setup(hass: HomeAssistant, config: ConfigType) -> bool:
     """Once per Home Assistant run: the dashboard card's files, websocket command and Lovelace resource."""
     async_register_websocket(hass)
+
+    # Favorite actions for blind and room covers. Registered once per run, not per account.
+    for name in ("favorite_1", "favorite_2"):
+        service.async_register_platform_entity_service(
+            hass,
+            DOMAIN,
+            name,
+            entity_domain=COVER_DOMAIN,
+            schema=None,
+            func=name,
+        )
+
     await async_serve_card(hass)
     # The sidebar page follows the config entries, loaded or not (see sidebar.py).
     async_follow_entries(hass)
@@ -43,10 +56,9 @@ async def async_setup(hass: HomeAssistant, config: ConfigType) -> bool:
     return True
 
 
-async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
+async def async_setup_entry(hass: HomeAssistant, entry: NeoSmartConfigEntry) -> bool:
     """Set up Neo Smart Blinds (Cloud) from a config entry."""
-    
-    hass.data.setdefault(DOMAIN, {})
+
     cloud_client = get_async_client(hass, verify_ssl=True)
     
     cloud_api = NeoSmartCloudAPI(
@@ -70,7 +82,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     # ask for a new one instead of failing every command from now on.
     cloud_api.auth_failed_callback = lambda: entry.async_start_reauth(hass)
 
-    hass.data[DOMAIN][entry.entry_id] = {"api": cloud_api, "data": full_data}
+    entry.runtime_data = NeoSmartRuntimeData(api=cloud_api, data=full_data)
 
     device_registry = dr.async_get(hass)
 
@@ -99,46 +111,21 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
 
-    # Register Favorite Services
-    # NOTE: These custom services are largely redundant now that dedicated ButtonEntity
-    # classes exist for favorites. Users can call button.press on the favorite button
-    # entities in automations instead. Consider removing these in a future version.
-    async def handle_favorite(call: ServiceCall):
-        """Handle favorite service calls."""
-        method = "favorite_1" if call.service == "favorite_1" else "favorite_2"
-        platforms = entity_platform.async_get_platforms(hass, DOMAIN)
-        
-        for platform in platforms:
-            if platform.domain == Platform.COVER:
-                entities = await platform.async_extract_from_service(call)
-                for entity in entities:
-                    if hasattr(entity, method):
-                        await getattr(entity, method)()
-
-    hass.services.async_register(DOMAIN, "favorite_1", handle_favorite)
-    hass.services.async_register(DOMAIN, "favorite_2", handle_favorite)
-
     entry.async_on_unload(entry.add_update_listener(async_reload_entry))
     await async_update_sidebar_panel(hass)
     return True
 
-async def async_reload_entry(hass: HomeAssistant, entry: ConfigEntry) -> None:
+async def async_reload_entry(hass: HomeAssistant, entry: NeoSmartConfigEntry) -> None:
     await hass.config_entries.async_reload(entry.entry_id)
 
-async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
+async def async_unload_entry(hass: HomeAssistant, entry: NeoSmartConfigEntry) -> bool:
     unload_ok = await hass.config_entries.async_unload_platforms(entry, PLATFORMS)
-    if unload_ok:
-        hass.data[DOMAIN].pop(entry.entry_id)
-        # Clean up registered services if no other config entries remain
-        if not hass.data[DOMAIN]:
-            hass.services.async_remove(DOMAIN, "favorite_1")
-            hass.services.async_remove(DOMAIN, "favorite_2")
     # A disabled entry stops asking for the sidebar page; a reloading one still does.
     await async_update_sidebar_panel(hass)
     return unload_ok
 
 
-async def async_remove_entry(hass: HomeAssistant, entry: ConfigEntry) -> None:
+async def async_remove_entry(hass: HomeAssistant, entry: NeoSmartConfigEntry) -> None:
     """The entry is being deleted: drop its sidebar page, and the card's resource with the last account."""
     await async_update_sidebar_panel(hass, removed_entry_id=entry.entry_id)
     if not [e for e in hass.config_entries.async_entries(DOMAIN) if e.entry_id != entry.entry_id]:

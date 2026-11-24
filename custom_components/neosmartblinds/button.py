@@ -1,8 +1,6 @@
 """Support for Neo Smart Blinds (Cloud) buttons."""
-import asyncio
 import logging
 from homeassistant.components.button import ButtonEntity
-from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.entity import DeviceInfo
@@ -17,18 +15,22 @@ from .api import (
     parse_blinds_from_data, 
     parse_rooms_from_data
 )
+from .entity import NeoSmartEntity, async_send_to_blinds
+from .models import NeoSmartConfigEntry
 
 _LOGGER = logging.getLogger(__name__)
 
+# Presses go to the Neo cloud one entity at a time.
+PARALLEL_UPDATES = 1
+
 async def async_setup_entry(
     hass: HomeAssistant,
-    entry: ConfigEntry,
+    entry: NeoSmartConfigEntry,
     async_add_entities: AddEntitiesCallback,
 ) -> None:
     """Set up the Neo Smart Blinds buttons."""
-    entry_data = hass.data[DOMAIN][entry.entry_id]
-    controller: NeoSmartCloudAPI = entry_data["api"]
-    full_data: dict = entry_data["data"]
+    controller: NeoSmartCloudAPI = entry.runtime_data.api
+    full_data: dict = entry.runtime_data.data
     
     entities = []
     
@@ -47,14 +49,14 @@ async def async_setup_entry(
     async_add_entities(entities)
 
 
-class NeoSmartBlindFavoriteButton(ButtonEntity):
+class NeoSmartBlindFavoriteButton(NeoSmartEntity, ButtonEntity):
     """Favorite button for an individual blind."""
     
     _attr_has_entity_name = True
 
     def __init__(self, controller: NeoSmartCloudAPI, blind_data: dict, fav_number: int):
         """Initialize the button."""
-        self._controller = controller
+        super().__init__(controller)
         self._blind_code = blind_data["blind_code"]
         self._controller_id = blind_data["controller_id"]
         self._motor_code = blind_data.get("motor_code", "unknown")
@@ -82,7 +84,7 @@ class NeoSmartBlindFavoriteButton(ButtonEntity):
         )
 
 
-class NeoSmartRoomFavoriteButton(ButtonEntity):
+class NeoSmartRoomFavoriteButton(NeoSmartEntity, ButtonEntity):
     """Favorite button for a Room group."""
     
     # Show exactly as "Room: Dining Favorite 1"
@@ -90,7 +92,7 @@ class NeoSmartRoomFavoriteButton(ButtonEntity):
 
     def __init__(self, controller: NeoSmartCloudAPI, room_data: dict, fav_number: int):
         """Initialize the room favorite button."""
-        self._controller = controller
+        super().__init__(controller)
         self._controller_id = room_data["controller_id"]
         self._blind_codes = room_data["blind_codes"]
         self._motor_codes = room_data.get("motor_codes", {})
@@ -114,9 +116,10 @@ class NeoSmartRoomFavoriteButton(ButtonEntity):
             "Triggering Favorite %s for all blinds in room: %s", 
             self._fav_number, self._attr_name
         )
-        await asyncio.gather(*(
-            self._controller.async_send_command(
-                self._controller_id, code, self._command, self._motor_codes.get(code, "unknown")
-            )
-            for code in self._blind_codes
-        ))
+        await async_send_to_blinds(
+            self._controller,
+            self._controller_id,
+            self._blind_codes,
+            self._motor_codes,
+            self._command,
+        )

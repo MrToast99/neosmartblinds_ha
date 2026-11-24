@@ -63,7 +63,24 @@ Changing an option reloads the integration.
 * **Favorite buttons** are created for every blind and room. They only do something on motors that have a favorite position set.
 * **Schedule switches** are named from the room, action and time, for example "Master Favorite 1 at 7:00". Turning one on or off enables or disables that schedule in the cloud.
 
-The `neosmartblinds.favorite_1` and `neosmartblinds.favorite_2` services also still work on cover entities, but the buttons above are easier to use in dashboards and automations (`button.press`).
+### Actions
+
+| Action | What it does |
+| --- | --- |
+| `neosmartblinds.favorite_1` | Moves the targeted blinds or room covers to their Favorite 1 position. |
+| `neosmartblinds.favorite_2` | The same for Favorite 2. |
+
+Target them at cover entities, for example:
+
+```yaml
+action: neosmartblinds.favorite_1
+target:
+  entity_id: cover.room_dining
+```
+
+The favorite buttons do the same thing and are easier to use in dashboards and automations (`button.press`). The usual cover actions (`cover.open_cover`, `cover.close_cover`, `cover.stop_cover`, `cover.set_cover_position`) work too.
+
+If the Neo cloud doesn't accept a command, the action fails with an error message, so you see it in the interface and automations can react to it. For a room, every blind is tried, and the error says how many didn't respond.
 
 ### How state works
 
@@ -100,6 +117,13 @@ If your dashboards are in YAML mode, resources can't be written for you, so the 
 The same card is also a page of its own in Home Assistant's sidebar, with no dashboard needed. It is on by default for new accounts. Accounts added before this option existed keep it off until you turn on **Show Neo Blinds in the sidebar** under **Configure**.
 
 ![The Neo Blinds page in Home Assistant, with a title bar and the room tiles.](https://raw.githubusercontent.com/MrToast99/NeoSmartBlinds_HA/main/docs/images/sidebar-page.png)
+
+## Removing the integration
+
+1.  Go to **Settings > Devices & Services** and open **Neo Smart Blinds (Cloud)**.
+2.  Click the **⋮** menu next to the account and choose **Delete**.
+
+This removes the account's devices and entities, its sidebar page, and the dashboard card's resource when it was the last account. Your Neo Smart Blinds app and its blinds are not touched. If you installed through the Marketplace, uninstall it there afterwards. For a manual install, delete the `neosmartblinds` folder from `custom_components` and restart Home Assistant. Cards you added to dashboards stay in their YAML until you delete them.
 
 ## Troubleshooting
 

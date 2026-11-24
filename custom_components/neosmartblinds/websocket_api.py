@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import voluptuous as vol
 from homeassistant.components import websocket_api
+from homeassistant.config_entries import ConfigEntryState
 from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers import entity_registry as er
 
@@ -18,10 +19,9 @@ def ws_card_info(hass: HomeAssistant, connection: websocket_api.ActiveConnection
     registry = er.async_get(hass)
     accounts = []
     for entry in hass.config_entries.async_entries(DOMAIN):
-        entry_data = hass.data.get(DOMAIN, {}).get(entry.entry_id)
-        if not entry_data:
-            continue  # not loaded
-        data = entry_data["data"]
+        if entry.state is not ConfigEntryState.LOADED:
+            continue
+        data = entry.runtime_data.data
         accounts.append(
             {
                 "entry_id": entry.entry_id,

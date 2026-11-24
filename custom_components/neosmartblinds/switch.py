@@ -1,25 +1,28 @@
 """Support for Neo Smart Blinds (Cloud) schedule switches."""
 import logging
 from homeassistant.components.switch import SwitchEntity
-from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.entity import DeviceInfo
 
 from .const import DOMAIN
 from .api import NeoSmartCloudAPI, parse_schedules_from_data
+from .entity import NeoSmartEntity
+from .models import NeoSmartConfigEntry
 
 _LOGGER = logging.getLogger(__name__)
 
+# Changes go to the Neo cloud one entity at a time.
+PARALLEL_UPDATES = 1
+
 async def async_setup_entry(
     hass: HomeAssistant,
-    entry: ConfigEntry,
+    entry: NeoSmartConfigEntry,
     async_add_entities: AddEntitiesCallback,
 ) -> None:
     """Set up the Neo Smart Blinds schedule switches."""
-    entry_data = hass.data[DOMAIN][entry.entry_id]
-    controller: NeoSmartCloudAPI = entry_data["api"]
-    full_data: dict = entry_data["data"]
+    controller: NeoSmartCloudAPI = entry.runtime_data.api
+    full_data: dict = entry.runtime_data.data
     
     schedules = parse_schedules_from_data(full_data)
     if not schedules:
@@ -36,7 +39,7 @@ async def async_setup_entry(
     ]
     async_add_entities(entities)
 
-class NeoSmartScheduleSwitch(SwitchEntity):
+class NeoSmartScheduleSwitch(NeoSmartEntity, SwitchEntity):
     """Representation of a Neo Smart Blind Schedule Switch."""
 
     _attr_has_entity_name = True
@@ -44,7 +47,7 @@ class NeoSmartScheduleSwitch(SwitchEntity):
 
     def __init__(self, controller: NeoSmartCloudAPI, schedule_data: dict, account_username: str):
         """Initialize the schedule switch."""
-        self._controller = controller
+        super().__init__(controller)
         self._schedule_id = schedule_data["id"]
         self._controller_id = schedule_data.get("controller_id") # Get from parser
         self._room_name = schedule_data.get("room_name", "Unknown")
@@ -68,12 +71,12 @@ class NeoSmartScheduleSwitch(SwitchEntity):
 
     async def async_turn_on(self, **kwargs) -> None:
         """Enable the schedule."""
-        if await self._controller.async_set_schedule_state(self._schedule_id, True):
-            self._attr_is_on = True
-            self.async_write_ha_state()
+        await self._controller.async_set_schedule_state(self._schedule_id, True)
+        self._attr_is_on = True
+        self.async_write_ha_state()
 
     async def async_turn_off(self, **kwargs) -> None:
         """Disable the schedule."""
-        if await self._controller.async_set_schedule_state(self._schedule_id, False):
-            self._attr_is_on = False
-            self.async_write_ha_state()
+        await self._controller.async_set_schedule_state(self._schedule_id, False)
+        self._attr_is_on = False
+        self.async_write_ha_state()

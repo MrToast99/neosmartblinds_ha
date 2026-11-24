@@ -10,6 +10,7 @@ from collections.abc import Callable
 
 from homeassistant.core import HomeAssistant
 from homeassistant.const import CONF_USERNAME, CONF_PASSWORD
+from homeassistant.exceptions import HomeAssistantError
 from homeassistant.helpers.typing import ConfigType
 
 from .const import (
@@ -295,19 +296,30 @@ class NeoSmartCloudAPI:
 
         return data
 
-    async def async_send_command(self, controller_id: str, blind_code: str, command: str, motor_code: str) -> bool:
-        """Send a command to a specific blind."""
+    @staticmethod
+    def _failure_reason(err: Exception) -> str:
+        """A short, safe description of a failed request (no URLs or tokens)."""
+        if isinstance(err, httpx.HTTPStatusError):
+            return f"HTTP {err.response.status_code}"
+        return type(err).__name__
+
+    async def async_send_command(self, controller_id: str, blind_code: str, command: str, motor_code: str) -> None:
+        """Send a command to a specific blind.
+
+        Raises HomeAssistantError if the command did not go through, so the user sees
+        the failure in Home Assistant.
+        """
         full_id_string = self._controller_map.get(controller_id)
         if not full_id_string:
             _LOGGER.error("No controller string found for UUID %s", controller_id)
-            return False
-            
+            raise HomeAssistantError("The Neo controller for this blind was not found. Reload the integration.")
+
         try:
             token, channel = blind_code.split('-')
-        except ValueError:
+        except ValueError as err:
             _LOGGER.error("Invalid blind_code format: %s", blind_code)
-            return False
-            
+            raise HomeAssistantError("This blind has an unexpected code and can't be controlled.") from err
+
         hash_string = self._generate_hash()
         url = API_COMMAND_URL
         
@@ -335,25 +347,38 @@ class NeoSmartCloudAPI:
         try:
             await self._api_request("POST", url, json=payload)
             _LOGGER.info("Command sent successfully")
-            return True
-        except Exception:
+        except NeoSmartCloudAuthError as err:
+            raise HomeAssistantError(
+                "The Neo login was rejected. Re-authenticate the integration with your current password."
+            ) from err
+        except Exception as err:
             # Error logging is always sanitized
             safe_payload = _sanitize_payload(payload)
             _LOGGER.error("Failed to send command. Sanitized payload was: %s", safe_payload, exc_info=True)
-            return False
+            raise HomeAssistantError(
+                f"The Neo cloud did not accept the command ({self._failure_reason(err)})."
+            ) from err
 
-    async def async_set_schedule_state(self, schedule_id: str, enabled: bool) -> bool:
-        """Enable or disable a cloud-based schedule."""
+    async def async_set_schedule_state(self, schedule_id: str, enabled: bool) -> None:
+        """Enable or disable a cloud-based schedule.
+
+        Raises HomeAssistantError if the change did not go through.
+        """
         _LOGGER.debug("Setting schedule %s to %s", schedule_id, enabled)
         url = API_SCHEDULE_UPDATE_URL.format(uuid=self._user_uuid, schedule_id=schedule_id)
-        payload = {"enabled": enabled} 
+        payload = {"enabled": enabled}
         try:
             await self._api_request("POST", url, json=payload)
             _LOGGER.info("Schedule state set successfully")
-            return True
-        except Exception:
+        except NeoSmartCloudAuthError as err:
+            raise HomeAssistantError(
+                "The Neo login was rejected. Re-authenticate the integration with your current password."
+            ) from err
+        except Exception as err:
             _LOGGER.error("Failed to set schedule state", exc_info=True)
-            return False
+            raise HomeAssistantError(
+                f"The Neo cloud did not accept the schedule change ({self._failure_reason(err)})."
+            ) from err
 
 # --- PARSER FUNCTIONS ---
 
