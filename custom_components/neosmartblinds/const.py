@@ -2,6 +2,9 @@
 
 DOMAIN = "neosmartblinds"
 
+# Option: the Neo Smart Blinds page in Home Assistant's sidebar (see sidebar.py).
+CONF_SHOW_SIDEBAR = "show_sidebar"
+
 API_BASE_URL = "https://api.neosmartblinds.com"
 API_AUTHORIZE_NATIVE_URL = f"{API_BASE_URL}/oauth/authorize/native"
 API_TOKEN_URL = f"{API_BASE_URL}/oauth/token"

@@ -13,8 +13,9 @@ from homeassistant.helpers.selector import (
     SelectSelectorConfig
 )
 
-from .const import DOMAIN
+from .const import CONF_SHOW_SIDEBAR, DOMAIN
 from .api import NeoSmartCloudAPI, NeoSmartCloudAuthError
+from .sidebar import sidebar_enabled
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -41,16 +42,19 @@ class NeoSmartCloudConfigFlow(ConfigFlow, domain=DOMAIN):
         if user_input is not None:
             username = user_input[CONF_USERNAME]
             password = user_input[CONF_PASSWORD]
+            # The sidebar choice is an option, not part of the account's stored data.
+            show_sidebar = user_input.get(CONF_SHOW_SIDEBAR, True)
+            credentials = {CONF_USERNAME: username, CONF_PASSWORD: password}
 
             try:
                 # Test credentials
                 client = get_async_client(self.hass, verify_ssl=True)
-                
+
                 # Pass empty options dict, as API now expects it
                 api = NeoSmartCloudAPI(
-                    self.hass, 
-                    user_input, 
-                    client, 
+                    self.hass,
+                    credentials,
+                    client,
                     options={}
                 )
                 await api.async_login()
@@ -64,7 +68,8 @@ class NeoSmartCloudConfigFlow(ConfigFlow, domain=DOMAIN):
                 
                 return self.async_create_entry(
                     title=f"Neo Blinds ({username})",
-                    data=user_input,
+                    data=credentials,
+                    options={CONF_SHOW_SIDEBAR: show_sidebar},
                 )
                 
             except NeoSmartCloudAuthError:
@@ -79,15 +84,19 @@ class NeoSmartCloudConfigFlow(ConfigFlow, domain=DOMAIN):
             data_schema=vol.Schema({
                 vol.Required(CONF_USERNAME): str,
                 vol.Required(CONF_PASSWORD): str,
+                vol.Required(CONF_SHOW_SIDEBAR, default=True): bool,
             }),
             errors=errors,
         )
 
     @staticmethod
     @callback
-    def async_get_options_flow(config_entry: ConfigEntry):
-        """Get the options flow handler."""
-        return NeoSmartBlindsOptionsFlow(config_entry)
+    def async_get_options_flow(config_entry: ConfigEntry) -> OptionsFlow:
+        """Get the options flow handler.
+
+        OptionsFlow sets self.config_entry itself, so it takes no constructor argument.
+        """
+        return NeoSmartBlindsOptionsFlow()
 
 
 class NeoSmartBlindsOptionsFlow(OptionsFlow):
@@ -105,12 +114,15 @@ class NeoSmartBlindsOptionsFlow(OptionsFlow):
         )
 
         options_schema = vol.Schema({
+            vol.Required(
+                CONF_SHOW_SIDEBAR,
+                default=sidebar_enabled(self.config_entry),
+            ): bool,
             vol.Optional(
                 "debug_logging_level",
                 default=current_level
             ): SelectSelector(SelectSelectorConfig(options=LOG_OPTIONS)),
         })
-        # --- END OF FIX ---
 
         return self.async_show_form(
             step_id="init",

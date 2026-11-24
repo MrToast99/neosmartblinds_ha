@@ -186,7 +186,8 @@ class NeoSmartRoomCover(CoverEntity):
         self._attr_name = room_data["name"] # e.g., "Room: Dining"
         self._controller_id = room_data["controller_id"]
         self._blind_codes = room_data["blind_codes"]
-        
+        self._motor_codes = room_data.get("motor_codes", {})
+
         self._attr_device_info = DeviceInfo(
             identifiers={(DOMAIN, self._controller_id)}
         )
@@ -204,7 +205,9 @@ class NeoSmartRoomCover(CoverEntity):
     async def _send_group_command(self, command: str):
         """Send a command to all blinds in the room concurrently."""
         await asyncio.gather(*(
-            self._controller.async_send_command(self._controller_id, code, command, self._motor_code)
+            self._controller.async_send_command(
+                self._controller_id, code, command, self._motor_codes.get(code, "unknown")
+            )
             for code in self._blind_codes
         ))
 

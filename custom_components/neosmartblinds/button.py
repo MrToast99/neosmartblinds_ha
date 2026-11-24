@@ -57,6 +57,7 @@ class NeoSmartBlindFavoriteButton(ButtonEntity):
         self._controller = controller
         self._blind_code = blind_data["blind_code"]
         self._controller_id = blind_data["controller_id"]
+        self._motor_code = blind_data.get("motor_code", "unknown")
         self._fav_number = fav_number
         self._command = CMD_FAV if fav_number == 1 else CMD_FAV2
         
@@ -92,6 +93,7 @@ class NeoSmartRoomFavoriteButton(ButtonEntity):
         self._controller = controller
         self._controller_id = room_data["controller_id"]
         self._blind_codes = room_data["blind_codes"]
+        self._motor_codes = room_data.get("motor_codes", {})
         self._fav_number = fav_number
         self._command = CMD_FAV if fav_number == 1 else CMD_FAV2
         
@@ -114,7 +116,7 @@ class NeoSmartRoomFavoriteButton(ButtonEntity):
         )
         await asyncio.gather(*(
             self._controller.async_send_command(
-                self._controller_id, code, self._command, self._motor_code
+                self._controller_id, code, self._command, self._motor_codes.get(code, "unknown")
             )
             for code in self._blind_codes
         ))

@@ -6,7 +6,11 @@
         "description": "Enter your Neo Smart Blinds app login credentials.",
         "data": {
           "username": "Username (Email)",
-          "password": "Password"
+          "password": "Password",
+          "show_sidebar": "Show Neo Blinds in the sidebar"
+        },
+        "data_description": {
+          "show_sidebar": "A page with your rooms and blinds in Home Assistant's sidebar. No dashboard needed."
         }
       }
     },
@@ -17,6 +21,19 @@
     },
     "abort": {
       "already_configured": "This account is already configured."
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "data": {
+          "show_sidebar": "Show Neo Blinds in the sidebar",
+          "debug_logging_level": "Debug Logging Level"
+        },
+        "data_description": {
+          "show_sidebar": "A page with your rooms and blinds in Home Assistant's sidebar. No dashboard needed."
+        }
+      }
     }
   }
 }

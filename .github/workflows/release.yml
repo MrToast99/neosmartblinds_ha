@@ -15,19 +15,25 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Get version from manifest
-        id: version
+      # The Marketplace treats the release tag as the installed version, so it has to match
+      # the manifest or users are offered a version that doesn't match what they get.
+      - name: Check the tag matches the manifest version
+        env:
+          TAG: ${{ github.event.release.tag_name }}
         run: |
           version=$(jq -r '.version' custom_components/neosmartblinds/manifest.json)
-          echo "version=$version" >> "$GITHUB_OUTPUT"
+          if [ "${TAG#v}" != "$version" ]; then
+            echo "::error::Release tag '$TAG' does not match manifest version '$version'"
+            exit 1
+          fi
 
+      # Optional convenience for manual installs; the Marketplace installs from the tag itself.
       - name: Create zip asset
         run: |
           cd custom_components/neosmartblinds
-          zip -r ../../neosmartblinds_ha.zip .
-          cd ../..
+          zip -r ../../neosmartblinds.zip .
 
       - name: Upload release asset
         uses: softprops/action-gh-release@v2
         with:
-          files: neosmartblinds_ha.zip
+          files: neosmartblinds.zip

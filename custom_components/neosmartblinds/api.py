@@ -362,6 +362,7 @@ def parse_blinds_from_data(data: dict) -> list:
                 blinds_dict[unique_id] = {
                     "unique_id": unique_id,
                     "name": blind.get("name"),
+                    "room_id": room_id,
                     "room_name": room_name,
                     "blind_code": blind_code,
                     "controller_id": controller_id,
@@ -432,16 +433,24 @@ def parse_rooms_from_data(data: dict) -> list:
             continue
             
         # Get all valid blind codes in this room
-        blind_codes = [f"{room_token}-{ch.zfill(2)}" for ch, b in room.get("blinds", {}).items() if b]
+        # Each blind in a room can have a different motor type, so keep the motor per blind code.
+        motor_codes = {
+            f"{room_token}-{ch.zfill(2)}": b.get("motorCode", "unknown")
+            for ch, b in room.get("blinds", {}).items()
+            if b
+        }
+        blind_codes = list(motor_codes)
         if not blind_codes:
             continue
 
         rooms_list.append({
             "unique_id": f"room_{room_id}_{controller_id}",
+            "room_id": room_id,
             "name": f"Room: {room_name}",
             "room_name": room_name,
             "controller_id": controller_id,
             "blind_codes": blind_codes,
+            "motor_codes": motor_codes,
         })
             
     return rooms_list

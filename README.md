@@ -1,82 +1,104 @@
 # Neo Smart Blinds (Cloud) Integration for Home Assistant
 
-[![hacs_badge](https://img.shields.io/badge/HACS-Default-orange.svg?style=for-the-badge)](https://github.com/hacs/integration)
+<!-- ha-marketplace:exclude-start -->
+[![Open your Home Assistant instance and open this repository in the Marketplace.](https://my.home-assistant.io/badges/marketplace_repository.svg)](https://my.home-assistant.io/redirect/marketplace_repository/?owner=MrToast99&repository=NeoSmartBlinds_HA&category=integration)
+<!-- ha-marketplace:exclude-end -->
 
-This is a custom integration for Home Assistant to control [Neo Smart Blinds](https://neosmartblinds.com/) via their cloud API.
+Control your [Neo Smart Blinds](https://neosmartblinds.com/) from Home Assistant through the Neo cloud, the same service the Neo Smart Blinds app uses.
 
-This integration provides:
-* **Cover Entities:** For each blind, allowing you to open, close, stop, and set a specific position.
-* **Button Entities:** Dedicated "Favorite 1" and "Favorite 2" buttons for motors that support them (e.g., "no" and "rx" types).
-* **Schedule Switches:** Creates `switch` entities for each schedule in the Neo app, allowing you to enable or disable them from Home Assistant.
-* **Logical Device Hierarchy:** Organizes entities into Account, Controller, and Blind devices for a clean UI.
+* **Covers:** every blind and every room, with open, close, stop and (where the motor supports it) a position.
+* **Favorite buttons:** "Favorite 1" and "Favorite 2" for each blind and each room.
+* **Schedule switches:** turn the schedules from the Neo app on or off.
+* **Dashboard card and sidebar page:** room tiles laid out like the Neo app (see [Dashboard card](#dashboard-card)).
+
+> **Cloud only.** This works only with blinds already set up in the Neo Smart Blinds app, and it needs an internet connection. There is no local control.
 
 ## Installation
 
-### HACS (Recommended)
+Requires Home Assistant 2026.11 or newer.
 
-1.  This integration is not yet in the default HACS repository.
-2.  You can add it as a **custom repository**:
-    * Go to HACS > Integrations > (three dots menu) > Custom repositories.
-    * Paste the URL to this GitHub repository in the "Repository" field.
-    * Select "Integration" as the category.
-    * Click "Add".
-3.  The integration will now appear in HACS. Click "Install" and follow the prompts.
-4.  Restart Home Assistant.
+### Marketplace (recommended)
 
-### Manual Installation
+This integration is not in the default catalog yet, so add it from its link:
 
-1.  Using the tool of your choice, copy the `neosmartblinds_ha` directory (from the `custom_components` folder in this repo) into your Home Assistant `custom_components` folder.
+1.  Click the badge above, or in Home Assistant open the **Marketplace** and choose **Add from link**. Paste this repository's URL and pick the category **Integration**.
+2.  Install **Neo Smart Blinds (Cloud)**.
+3.  Add the integration as described under [Configuration](#configuration). A first install needs no restart.
+
+### Manual installation
+
+1.  Copy the `neosmartblinds` folder from this repository's `custom_components` folder into your Home Assistant `custom_components` folder.
 2.  Restart Home Assistant.
 
 ## Configuration
 
-Configuration is done through the Home Assistant UI:
+1.  Go to **Settings > Devices & Services** and click **Add Integration**.
+2.  Search for **Neo Smart Blinds (Cloud)**.
+3.  Enter the **Username (Email)** and **Password** you use in the Neo Smart Blinds app.
+4.  Choose whether to **Show Neo Blinds in the sidebar** (on by default).
 
-1.  Go to **Settings > Devices & Services**.
-2.  Click the **+ Add Integration** button.
-3.  Search for "Neo Smart Blinds (Cloud)" and select it.
-4.  You will be prompted for your Neo Smart Blinds app **Username (Email)** and **Password**.
-5.  The integration will log in, discover your account, controllers, blinds, and schedules, and create all the corresponding devices and entities.
+The integration signs in, finds your rooms, controllers, blinds and schedules, and creates the devices and entities for them. Your login is stored in Home Assistant's config entry so the integration can sign in again, and it is only sent to the Neo cloud.
 
-To test that login is working after installation, add the integration with a Neo Smart Blinds account, confirm that devices and entities are created, restart Home Assistant, and confirm the integration loads again without asking you to re-enter credentials.
+### Options
 
-## How It Works
+Open the integration and choose **Configure** to change:
 
-This integration works by polling the official Neo Smart Blinds cloud API.
+* **Show Neo Blinds in the sidebar:** adds or removes the sidebar page.
+* **Debug Logging Level:** how much of the data sent to the Neo cloud is written to the debug log. The default is redacted. Choose full logging only while troubleshooting, and don't post those logs publicly, because they are not redacted.
 
-* **Automatic Entity Setup:** After you log in, the integration automatically queries the cloud for your account details. It then creates a logical hierarchy of devices:
-    * An **Account** device (top-level).
-    * A **Controller** device for each hub, linked to the Account.
-    * A **Blind** device for each blind, linked to its parent Controller.
-    * Entities (`cover`, `button`, `switch`) are then attached to the correct device.
-* **Cloud Requirement:** This integration **only** works with blinds that are already set up and connected in the Neo Smart Blinds app. It relies entirely on the cloud connection and does not support local-only control.
+Changing an option reloads the integration.
 
-## Features
+## What you get
 
-This integration creates a new "Blind" device for each of your blinds, which contains the cover and favorite buttons. Schedule switches are attached to the "Controller" device.
+| Device | Entities |
+| --- | --- |
+| **Account** | The top-level device for your login. |
+| **Controller** (one per Neo controller, named after its room) | A cover and two favorite buttons for each room ("Room: Dining", "Room: Dining Favorite 1"), plus a switch for each schedule. |
+| **Blind** (one per blind, under its controller) | A cover, plus "Favorite 1" and "Favorite 2" buttons. |
 
-### Cover Controls
+* **Blind covers** support open, close and stop. A position slider is added for motors that report percent support.
+* **Room covers** open, close or stop every blind in the room at once. They have no position of their own; use the blinds or the card's "set position" slider for that.
+* **Favorite buttons** are created for every blind and room. They only do something on motors that have a favorite position set.
+* **Schedule switches** are named from the room, action and time, for example "Master Favorite 1 at 7:00". Turning one on or off enables or disables that schedule in the cloud.
 
-Each blind will appear as a `cover` entity attached to its "Blind" device. This entity provides:
-* Open, Close, and Stop controls.
-* A position slider (if supported by the motor).
-* **Note:** The tilt buttons are no longer used. Favorite controls have been moved to dedicated `button` entities.
+The `neosmartblinds.favorite_1` and `neosmartblinds.favorite_2` services also still work on cover entities, but the buttons above are easier to use in dashboards and automations (`button.press`).
 
-### Favorite Buttons
+### How state works
 
-For motors that support favorite positions (like "no" and "rx" types), the integration will automatically create two new entities on the "Blind" device:
-* **Favorite 1:** A `button` entity to move the blind to its first favorite position.
-* **Favorite 2:** A `button` entity to move the blind to its second favorite position.
+The Neo cloud doesn't report where a blind is, so Home Assistant only knows what it last told the blind to do. A blind moved with the remote or the Neo app won't update in Home Assistant, and the covers are marked as having an assumed state.
 
-You can use these buttons in your dashboards or call the `button.press` service in automations.
+Rooms, blinds and schedules are read when the integration loads. If you add a blind or change a schedule in the Neo app, reload the integration (**Settings > Devices & Services > Neo Smart Blinds > ⋮ > Reload**) to pick it up.
 
-### Schedule Switches
+## Dashboard card
 
-Each schedule you have configured in the Neo Smart Blinds app will appear as a `switch` entity attached to its "Controller" device.
-* The switch name is automatically generated based on the room, action, and time (e.g., "Master Favorite 1 at 7:00").
-* Turning the switch **on** enables the schedule in the cloud.
-* Turning the switch **off** disables the schedule in the cloud.
+The integration serves its own card and adds it to your dashboard resources, so there is nothing to copy or install. Add it from the card picker (**Neo Smart Blinds**) or in YAML:
+
+```yaml
+type: custom:neosmartblinds-card
+title: Blinds              # optional
+room: Master               # optional; leave out to list every room
+show_all: true             # optional, an "All rooms" tile above the rooms
+show_blinds: true          # optional, expandable list of each blind in a room
+show_schedules: true       # optional, schedule switches inside a room
+start_expanded: false      # optional, open every room's details at first
+```
+
+Each room tile has open, stop, close, Favorite 1, Favorite 2 and a "set position" slider for the whole room. Expand a room to control each blind on its own and to switch its schedules on or off.
+
+If your dashboards are in YAML mode, resources can't be written for you, so the card is loaded on every page instead.
+
+### Sidebar page
+
+The same card is also a page of its own in Home Assistant's sidebar, with no dashboard needed. It is on by default for new accounts. Accounts added before this option existed keep it off until you turn on **Show Neo Blinds in the sidebar** under **Configure**.
+
+## Troubleshooting
+
+* **Controls do nothing, or you see an error in the log:** check that the same action works in the Neo Smart Blinds app, then reload the integration.
+* **The login fails:** use the email and password from the Neo Smart Blinds app. If you changed your password there, remove the integration and add it again.
+* **The card says the integration isn't loaded:** the integration failed to start. Check **Settings > System > Logs** for `neosmartblinds`.
+* **A bug or a question:** [open an issue](https://github.com/MrToast99/NeoSmartBlinds_HA/issues) and include the Home Assistant version, the integration version and the relevant log lines.
 
 ## Credits
 
 * Original code by [@MrToast99](https://github.com/MrToast99).
+* This is an unofficial, community-made integration. It is not affiliated with, endorsed by or supported by Neo Smart Blinds. The Neo Smart Blinds name and logo are trademarks of their owner and are used here only to identify the product this integration works with.
