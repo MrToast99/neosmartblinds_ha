@@ -22,17 +22,19 @@ jobs:
     name: Hassfest
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - uses: home-assistant/actions/hassfest@master
 
   tests:
     name: Tests
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
         with:
-          python-version: "3.13"
+          # Home Assistant 2026.10 and later need Python 3.14. On an older Python, pip quietly
+          # installs an old Home Assistant that lacks APIs this integration uses.
+          python-version: "3.14"
           cache: pip
           cache-dependency-path: requirements_test.txt
       - run: pip install -r requirements_test.txt
